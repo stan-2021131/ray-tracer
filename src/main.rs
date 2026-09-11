@@ -129,28 +129,54 @@ fn main() {
 
     let mut framebuffer = Framebuffer::new(WIDTH, HEIGHT);
 
-    let mut window = Window::new("Cube", WIDTH, HEIGHT, WindowOptions::default()).unwrap();
+    let mut window = Window::new("Pyramid", WIDTH, HEIGHT, WindowOptions::default()).unwrap();
 
     let ivory = Material::new(Color::new(100, 100, 80), 50.0, [0.6, 0.3]);
     let _rubber = Material::new(Color::new(80, 0, 0), 10.0, [0.9, 0.1]);
     let _cobalt = Material::new(Color::new(40, 80, 140), 80.0, [0.7, 0.4]);
     let jade = Material::new(Color::new(60, 130, 100), 30.0, [0.8, 0.25]);
 
-    let objects: Vec<Box<dyn RayIntersect>> = vec![
-        Box::new(Cube::new(Vec3::new(0.0, 0.0, 0.0), 1.5, ivory)),
-        Box::new(Plane::new_with_normal(
-            Vec3::new(0.0, -0.75, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-            10.0,
-            10.0,
-            jade,
-        )),
+    let cube_size = 0.8;
+    let mut objects: Vec<Box<dyn RayIntersect>> = Vec::new();
+
+    // Niveles de la pirámide: (nivel_index, radio)
+    // Nivel 0 (más bajo): radio 2 -> 5x5 cubos
+    // Nivel 1 (segundo nivel): radio 1 -> 3x3 cubos
+    // Nivel 2 (cúspide): radio 0 -> 1x1 cubo
+    let levels: [(i32, i32); 3] = [
+        (0, 2),
+        (1, 1),
+        (2, 0),
     ];
+
+    for &(level_idx, radius) in &levels {
+        let y = (level_idx as f32 - 1.0) * cube_size;
+        for x in -radius..=radius {
+            for z in -radius..=radius {
+                // Modo cascarón: solo incluir cubos exteriores en el perímetro de cada nivel
+                let is_outer = radius == 0 || x.abs() == radius || z.abs() == radius;
+                if is_outer {
+                    let center = Vec3::new(x as f32 * cube_size, y, z as f32 * cube_size);
+                    objects.push(Box::new(Cube::new(center, cube_size, ivory)));
+                }
+            }
+        }
+    }
+
+    // Plano / suelo debajo de la pirámide
+    let floor_y = -1.5 * cube_size;
+    objects.push(Box::new(Plane::new_with_normal(
+        Vec3::new(0.0, floor_y, 0.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        16.0,
+        16.0,
+        jade,
+    )));
 
     let light = Light::new(Vec3::new(-6.0, 6.0, 8.0), Color::new(255, 255, 255), 1.5);
 
     let mut camera = Camera::new(
-        Vec3::new(0.0, 0.0, 5.0),
+        Vec3::new(0.0, 2.0, 6.0),
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(0.0, 1.0, 0.0),
     );
