@@ -2,7 +2,7 @@ use crate::ray_intersect::{Intersect, Material, RayIntersect};
 use nalgebra_glm::{dot, Vec3};
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Plane {
     pub center: Vec3,
     pub normal: Vec3,
@@ -93,11 +93,15 @@ impl RayIntersect for Plane {
             -self.normal
         };
 
+        let u_coord = (u_proj / self.width) + 0.5;
+        let v_coord = (v_proj / self.height) + 0.5;
+        let material = self.material.with_uv(u_coord, v_coord);
+
         Some(Intersect {
             point,
             normal,
             distance: t,
-            material: self.material,
+            material,
         })
     }
 }

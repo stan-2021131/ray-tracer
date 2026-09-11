@@ -25,6 +25,41 @@ impl Cube {
             material,
         }
     }
+
+    /// Calcula las coordenadas de textura UV (u, v) en el rango [0.0, 1.0] para cualquier cara impactada del cubo.
+    pub fn get_uv(&self, point: &Vec3, normal: &Vec3) -> (f32, f32) {
+        let half = self.size / 2.0;
+        let d = (point - self.center) / half;
+
+        if normal.x.abs() > 0.5 {
+            // Caras laterales (+X o -X): usamos los ejes Z e Y
+            let u = if normal.x > 0.0 {
+                (1.0 - d.z) / 2.0
+            } else {
+                (d.z + 1.0) / 2.0
+            };
+            let v = (1.0 - d.y) / 2.0;
+            (u, v)
+        } else if normal.y.abs() > 0.5 {
+            // Caras superior e inferior (+Y o -Y): usamos los ejes X y Z
+            let u = (d.x + 1.0) / 2.0;
+            let v = if normal.y > 0.0 {
+                (d.z + 1.0) / 2.0
+            } else {
+                (1.0 - d.z) / 2.0
+            };
+            (u, v)
+        } else {
+            // Caras frontal y trasera (+Z o -Z): usamos los ejes X e Y
+            let u = if normal.z > 0.0 {
+                (d.x + 1.0) / 2.0
+            } else {
+                (1.0 - d.x) / 2.0
+            };
+            let v = (1.0 - d.y) / 2.0;
+            (u, v)
+        }
+    }
 }
 
 impl RayIntersect for Cube {
@@ -127,12 +162,14 @@ impl RayIntersect for Cube {
         };
 
         let point = ray_origin + ray_direction * t;
+        let (u, v) = self.get_uv(&point, &normal);
+        let material = self.material.with_uv(u, v);
 
         Some(Intersect {
             point,
             normal,
             distance: t,
-            material: self.material,
+            material,
         })
     }
 }
@@ -168,4 +205,3 @@ mod tests {
         assert!(hit.is_none());
     }
 }
-

@@ -12,9 +12,13 @@ Un motor de trazado de rayos (*Ray Tracer*) en tiempo real escrito en Rust con r
   - **Esfera (`Sphere`)**: Intersección analítica rayo-esfera con cálculo de normales y distancias exactas.
   - **Plano (`Plane`)**: Rectángulo finito ajustable y orientable en el espacio 3D mediante vectores normales y base ortonormal precalculada.
   - **Cubo (`Cube`)**: Implementación ultra eficiente de caja alineada a los ejes (AABB) mediante el algoritmo **Slab Method** (Kay-Kajiya / Williams et al.), permitiendo descarte rápido de rayos e identificación inmediata de la cara impactada.
+- **Mapeo de Texturas UV Reutilizable**:
+  - Soporte de texturas de imagen externa (PNG, JPG) integrado en `Material`.
+  - Muestreo UV con *wrapping* seguro en las 6 caras del cubo, planos rectangulares y esferas.
+  - Sistema de *fallback* automático: si una imagen no se encuentra, genera una textura placeholder en memoria sin interrumpir la ejecución.
 - **Modelo de Iluminación y Sombreado**:
   - Iluminación difusa (*Lambertian*) y reflejos especulares basados en el modelo Phong.
-  - Materiales configurables (`albedo`, `specular`, `diffuse`).
+  - Materiales configurables (`albedo`, `specular`, `diffuse`, `texture`).
 - **Cámara Orbital Interactiva**:
   - Control de cámara en tiempo real con rotación orbital (*Yaw* y *Pitch*) y matriz de cambio de base.
 - **Rendimiento y Multithreading Nativo**:
@@ -23,17 +27,19 @@ Un motor de trazado de rayos (*Ray Tracer*) en tiempo real escrito en Rust con r
 
 ---
 
-##  Estructura del Código
+## Estructura del Código
 
 ```text
 ray-tracer/
 ├── Cargo.toml              # Configuración y dependencias del proyecto
 ├── README.md               # Documentación general
+├── textures/               # Carpeta para texturas de imagen (PNG, JPG)
 └── src/
     ├── main.rs             # Ciclo de renderizado, sombreado y control de ventana
-    ├── sphere.rs           # Primitiva de Esfera
-    ├── plane.rs            # Primitiva de Plano finito ajustable
-    ├── cube.rs             # Primitiva de Cubo (Slab Method)
+    ├── sphere.rs           # Primitiva de Esfera con mapeo UV esférico
+    ├── plane.rs            # Primitiva de Plano finito ajustable con UV planar
+    ├── cube.rs             # Primitiva de Cubo (Slab Method) con UV cúbico
+    ├── texture.rs          # Carga de texturas con `image` y muestreo UV
     ├── camera.rs           # Cámara, matriz de proyección y órbita
     ├── color.rs            # Manejo de colores RGB y conversiones
     ├── framebuffer.rs      # Buffer de pantalla y manipulación de píxeles
@@ -43,7 +49,33 @@ ray-tracer/
 
 ---
 
-##  Controles de la Ventana
+## 🎨 Sistema de Texturizado
+
+El motor cuenta con un sistema desacoplado de texturas que permite aplicar imágenes a cualquier objeto de la escena:
+
+```rust
+use std::sync::Arc;
+use crate::texture::Texture;
+use crate::ray_intersect::Material;
+
+// 1. Cargar la textura (PNG / JPG)
+let texture = Arc::new(Texture::new("./textures/wall.png"));
+
+// 2. Crear material texturizado
+let textured_mat = Material::new_with_texture(
+    Color::new(255, 255, 255), // Tinte base
+    50.0,                       // Especular
+    [0.8, 0.2],                 // Albedo [difuso, especular]
+    texture,
+);
+
+// 3. Asignar al cubo u otra forma geométrica
+let cube = Cube::new(center, size, textured_mat);
+```
+
+---
+
+## Controles de la Ventana
 
 | Tecla | Acción |
 | :--- | :--- |
@@ -53,7 +85,7 @@ ray-tracer/
 
 ---
 
-##  Compilación y Ejecución
+## Compilación y Ejecución
 
 ### Requisitos Previos
 * [Rust y Cargo](https://www.rust-lang.org/tools/install) instalados.

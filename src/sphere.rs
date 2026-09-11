@@ -1,12 +1,14 @@
 use crate::ray_intersect::{Intersect, Material, RayIntersect};
 use nalgebra_glm::{dot, Vec3};
 
+#[allow(dead_code)]
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
     pub material: Material,
 }
 
+#[allow(dead_code)]
 impl Sphere {
     pub fn new(center: Vec3, radius: f32, material: Material) -> Self {
         Sphere {
@@ -38,14 +40,19 @@ impl RayIntersect for Sphere {
         }
 
         let point = ray_origin + ray_direction * t;
-
         let normal = (point - self.center).normalize();
+
+        // Mapeo UV esférico
+        let d = (point - self.center) / self.radius;
+        let u_coord = 0.5 + d.z.atan2(d.x) / (2.0 * std::f32::consts::PI);
+        let v_coord = 0.5 - d.y.clamp(-1.0, 1.0).asin() / std::f32::consts::PI;
+        let material = self.material.with_uv(u_coord, v_coord);
 
         Some(Intersect {
             point,
             normal,
             distance: t,
-            material: self.material,
+            material,
         })
     }
 }
