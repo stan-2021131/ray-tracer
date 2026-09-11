@@ -134,10 +134,17 @@ fn main() {
     let ivory = Material::new(Color::new(100, 100, 80), 50.0, [0.6, 0.3]);
     let _rubber = Material::new(Color::new(80, 0, 0), 10.0, [0.9, 0.1]);
     let _cobalt = Material::new(Color::new(40, 80, 140), 80.0, [0.7, 0.4]);
-    let _jade = Material::new(Color::new(60, 130, 100), 30.0, [0.8, 0.25]);
+    let jade = Material::new(Color::new(60, 130, 100), 30.0, [0.8, 0.25]);
 
     let objects: Vec<Box<dyn RayIntersect>> = vec![
         Box::new(Cube::new(Vec3::new(0.0, 0.0, 0.0), 1.5, ivory)),
+        Box::new(Plane::new_with_normal(
+            Vec3::new(0.0, -0.75, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            10.0,
+            10.0,
+            jade,
+        )),
     ];
 
     let light = Light::new(Vec3::new(-6.0, 6.0, 8.0), Color::new(255, 255, 255), 1.5);
