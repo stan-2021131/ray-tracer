@@ -2,6 +2,8 @@
 
 Un motor de trazado de rayos (*Ray Tracer*) en tiempo real escrito en Rust con renderizado interactivo, iluminación Phong y aceleración multihilo nativa.
 
+![Demo](docs/piramide.gif)
+
 ---
 
 ## Características
