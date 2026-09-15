@@ -20,9 +20,7 @@ impl Framebuffer {
     }
 
     pub fn clear(&mut self) {
-        for pixel in self.buffer.iter_mut() {
-            *pixel = self.background_color;
-        }
+        self.buffer.fill(self.background_color);
     }
 
     pub fn point(&mut self, x: usize, y: usize) {

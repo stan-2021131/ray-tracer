@@ -2,7 +2,7 @@ use crate::camera::Camera;
 use crate::color::Color;
 use crate::framebuffer::Framebuffer;
 use crate::light::Light;
-use crate::ray_intersect::{Intersect, RayIntersect};
+use crate::ray_intersect::{Intersect, Object, RayIntersect};
 use nalgebra_glm::{dot, normalize, Vec3};
 use std::f32::consts::PI;
 
@@ -22,15 +22,13 @@ pub fn cast_shadow(
     intersect: &Intersect,
     light_direction: &Vec3,
     light: &Light,
-    objects: &[Box<dyn RayIntersect>],
+    objects: &[Object],
 ) -> bool {
     let shadow_ray_origin = intersect.point + intersect.normal * SHADOW_BIAS;
     let light_distance = (light.position - intersect.point).magnitude();
 
     objects.iter().any(|object| {
-        object
-            .ray_intersect(&shadow_ray_origin, light_direction)
-            .is_some_and(|blocker| blocker.distance < light_distance)
+        object.ray_intersect_distance(&shadow_ray_origin, light_direction, light_distance)
     })
 }
 
@@ -39,7 +37,7 @@ pub fn shade(
     intersect: &Intersect,
     ray_origin: &Vec3,
     light: &Light,
-    objects: &[Box<dyn RayIntersect>],
+    objects: &[Object],
 ) -> Color {
     let light_direction = (light.position - intersect.point).normalize();
     let view_direction = (ray_origin - intersect.point).normalize();
@@ -50,8 +48,8 @@ pub fn shade(
 
     // Componente difusa (Lambertiana)
     let diffuse_intensity = dot(&intersect.normal, &light_direction).max(0.0);
-    let diffuse = intersect.material.diffuse
-        * (diffuse_intensity * intersect.material.albedo[0] * light.intensity * shadow_factor);
+    let diffuse = intersect.diffuse_color
+        * (diffuse_intensity * intersect.albedo[0] * light.intensity * shadow_factor);
 
     // Componente especular (Phong)
     let specular = if in_shadow {
@@ -60,8 +58,8 @@ pub fn shade(
         let reflect_direction = reflect(&-light_direction, &intersect.normal);
         let specular_intensity = dot(&view_direction, &reflect_direction)
             .max(0.0)
-            .powf(intersect.material.specular);
-        light.color * (specular_intensity * intersect.material.albedo[1] * light.intensity)
+            .powf(intersect.specular);
+        light.color * (specular_intensity * intersect.albedo[1] * light.intensity)
     };
 
     diffuse + specular
@@ -71,7 +69,7 @@ pub fn shade(
 pub fn cast_ray(
     ray_origin: &Vec3,
     ray_direction: &Vec3,
-    objects: &[Box<dyn RayIntersect>],
+    objects: &[Object],
     light: &Light,
     depth: u32,
 ) -> Color {
@@ -97,7 +95,7 @@ pub fn cast_ray(
 
     let color = shade(&intersect, ray_origin, light, objects);
 
-    let reflectivity = intersect.material.albedo[2];
+    let reflectivity = intersect.albedo[2];
 
     if reflectivity <= 0.0 {
         return color;
@@ -113,7 +111,7 @@ pub fn cast_ray(
 /// Renderiza la escena completa de forma multihilo en el framebuffer.
 pub fn render(
     framebuffer: &mut Framebuffer,
-    objects: &[Box<dyn RayIntersect>],
+    objects: &[Object],
     camera: &Camera,
     light: &Light,
 ) {

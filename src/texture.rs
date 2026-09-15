@@ -5,7 +5,7 @@ use std::fmt;
 pub struct Texture {
     pub width: usize,
     pub height: usize,
-    pub buffer: Vec<u32>,
+    pub buffer: Vec<Color>,
 }
 
 impl Texture {
@@ -20,7 +20,7 @@ impl Texture {
                     .pixels()
                     .map(|p| {
                         let [r, g, b] = p.0;
-                        ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+                        Color::new(r, g, b)
                     })
                     .collect();
                 Texture {
@@ -43,14 +43,13 @@ impl Texture {
     pub fn placeholder(width: usize, height: usize) -> Self {
         let mut buffer = Vec::with_capacity(width * height);
         let block_size = 8;
+        let gold = Color::from_hex(0xD4AF37);
+        let dark = Color::from_hex(0x2A2A2A);
+
         for y in 0..height {
             for x in 0..width {
                 let is_even = ((x / block_size) + (y / block_size)) % 2 == 0;
-                let color = if is_even {
-                    0xD4AF37 // Dorado / Ocre
-                } else {
-                    0x2A2A2A // Gris oscuro / Carbón
-                };
+                let color = if is_even { gold } else { dark };
                 buffer.push(color);
             }
         }
@@ -61,10 +60,11 @@ impl Texture {
         }
     }
 
-    /// Retorna el valor hexadecimal de un píxel en coordenadas de imagen enteras
-    pub fn get_pixel(&self, x: usize, y: usize) -> u32 {
+    /// Retorna el color de un píxel en coordenadas de imagen enteras
+    #[allow(dead_code)]
+    pub fn get_pixel(&self, x: usize, y: usize) -> Color {
         if self.width == 0 || self.height == 0 || self.buffer.is_empty() {
-            return 0xFFFFFF;
+            return Color::new(255, 255, 255);
         }
         let px = x.min(self.width - 1);
         let py = y.min(self.height - 1);
@@ -73,6 +73,7 @@ impl Texture {
 
     /// Muestrea la textura usando coordenadas normalizadas (u, v) en el rango [0.0, 1.0].
     /// Aplica wrapping seguro para coordenadas de cualquier forma 3D.
+    #[inline]
     pub fn get_color(&self, u: f32, v: f32) -> Color {
         if self.width == 0 || self.height == 0 || self.buffer.is_empty() {
             return Color::new(255, 255, 255);
@@ -84,7 +85,7 @@ impl Texture {
         let x = ((u * (self.width - 1) as f32).round() as usize).min(self.width - 1);
         let y = ((v * (self.height - 1) as f32).round() as usize).min(self.height - 1);
 
-        Color::from_hex(self.get_pixel(x, y))
+        self.buffer[y * self.width + x]
     }
 }
 

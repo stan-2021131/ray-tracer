@@ -2,6 +2,7 @@ use crate::ray_intersect::{Intersect, Material, RayIntersect};
 use nalgebra_glm::{dot, Vec3};
 
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
@@ -23,36 +24,63 @@ impl RayIntersect for Sphere {
     fn ray_intersect(&self, ray_origin: &Vec3, ray_direction: &Vec3) -> Option<Intersect> {
         let oc = ray_origin - self.center;
 
-        let a = dot(ray_direction, ray_direction);
-        let b = 2.0 * dot(&oc, ray_direction);
+        // ray_direction ya está normalizado (a = 1.0)
+        let b = dot(&oc, ray_direction);
         let c = dot(&oc, &oc) - self.radius * self.radius;
 
-        let discriminant = b * b - 4.0 * a * c;
+        let discriminant = b * b - c;
 
         if discriminant <= 0.0 {
             return None;
         }
 
-        let t = (-b - discriminant.sqrt()) / (2.0 * a);
+        let sqrt_d = discriminant.sqrt();
+        let mut t = -b - sqrt_d;
 
         if t <= 0.0 {
-            return None;
+            t = -b + sqrt_d;
+            if t <= 0.0 {
+                return None;
+            }
         }
 
         let point = ray_origin + ray_direction * t;
-        let normal = (point - self.center).normalize();
+        // Evitar sqrt en normalización dividiendo directamente por el radio conocido
+        let normal = (point - self.center) / self.radius;
 
-        // Mapeo UV esférico
-        let d = (point - self.center) / self.radius;
-        let u_coord = 0.5 + d.z.atan2(d.x) / (2.0 * std::f32::consts::PI);
-        let v_coord = 0.5 - d.y.clamp(-1.0, 1.0).asin() / std::f32::consts::PI;
-        let material = self.material.with_uv(u_coord, v_coord);
+        // Mapeo UV esférico (normal es equivalente a d)
+        let u_coord = 0.5 + normal.z.atan2(normal.x) / (2.0 * std::f32::consts::PI);
+        let v_coord = 0.5 - normal.y.clamp(-1.0, 1.0).asin() / std::f32::consts::PI;
+        let diffuse_color = self.material.get_diffuse_color(u_coord, v_coord);
 
         Some(Intersect {
             point,
             normal,
             distance: t,
-            material,
+            diffuse_color,
+            specular: self.material.specular,
+            albedo: self.material.albedo,
         })
+    }
+
+    fn ray_intersect_distance(&self, ray_origin: &Vec3, ray_direction: &Vec3, max_distance: f32) -> bool {
+        let oc = ray_origin - self.center;
+        let b = dot(&oc, ray_direction);
+        let c = dot(&oc, &oc) - self.radius * self.radius;
+
+        let discriminant = b * b - c;
+
+        if discriminant <= 0.0 {
+            return false;
+        }
+
+        let sqrt_d = discriminant.sqrt();
+        let mut t = -b - sqrt_d;
+
+        if t <= 0.0 {
+            t = -b + sqrt_d;
+        }
+
+        t > 0.0 && t < max_distance
     }
 }

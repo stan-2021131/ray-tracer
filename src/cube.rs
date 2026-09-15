@@ -2,6 +2,7 @@ use crate::ray_intersect::{Intersect, Material, RayIntersect};
 use nalgebra_glm::Vec3;
 
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct Cube {
     pub center: Vec3,
     pub size: f32,
@@ -163,14 +164,56 @@ impl RayIntersect for Cube {
 
         let point = ray_origin + ray_direction * t;
         let (u, v) = self.get_uv(&point, &normal);
-        let material = self.material.with_uv(u, v);
+        let diffuse_color = self.material.get_diffuse_color(u, v);
 
         Some(Intersect {
             point,
             normal,
             distance: t,
-            material,
+            diffuse_color,
+            specular: self.material.specular,
+            albedo: self.material.albedo,
         })
+    }
+
+    fn ray_intersect_distance(&self, ray_origin: &Vec3, ray_direction: &Vec3, max_distance: f32) -> bool {
+        let inv_dx = 1.0 / ray_direction.x;
+        let (t0x, t1x) = if ray_direction.x >= 0.0 {
+            ((self.min.x - ray_origin.x) * inv_dx, (self.max.x - ray_origin.x) * inv_dx)
+        } else {
+            ((self.max.x - ray_origin.x) * inv_dx, (self.min.x - ray_origin.x) * inv_dx)
+        };
+
+        let inv_dy = 1.0 / ray_direction.y;
+        let (t0y, t1y) = if ray_direction.y >= 0.0 {
+            ((self.min.y - ray_origin.y) * inv_dy, (self.max.y - ray_origin.y) * inv_dy)
+        } else {
+            ((self.max.y - ray_origin.y) * inv_dy, (self.min.y - ray_origin.y) * inv_dy)
+        };
+
+        let t_min = t0x.max(t0y);
+        let t_max = t1x.min(t1y);
+
+        if t_min > t_max {
+            return false;
+        }
+
+        let inv_dz = 1.0 / ray_direction.z;
+        let (t0z, t1z) = if ray_direction.z >= 0.0 {
+            ((self.min.z - ray_origin.z) * inv_dz, (self.max.z - ray_origin.z) * inv_dz)
+        } else {
+            ((self.max.z - ray_origin.z) * inv_dz, (self.min.z - ray_origin.z) * inv_dz)
+        };
+
+        let t_min = t_min.max(t0z);
+        let t_max = t_max.min(t1z);
+
+        if t_min > t_max {
+            return false;
+        }
+
+        let t = if t_min > 0.0 { t_min } else { t_max };
+        t > 0.0 && t < max_distance
     }
 }
 
@@ -181,7 +224,7 @@ mod tests {
 
     #[test]
     fn test_slab_front_intersection() {
-        let mat = Material::new(Color::new(255, 0, 0), 10.0, [0.8, 0.2]);
+        let mat = Material::new(Color::new(255, 0, 0), 10.0, [0.8, 0.2, 0.0]);
         let cube = Cube::new(Vec3::new(0.0, 0.0, 0.0), 2.0, mat);
 
         let ray_origin = Vec3::new(0.0, 0.0, 5.0);
@@ -195,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_slab_miss() {
-        let mat = Material::new(Color::new(255, 0, 0), 10.0, [0.8, 0.2]);
+        let mat = Material::new(Color::new(255, 0, 0), 10.0, [0.8, 0.2, 0.0]);
         let cube = Cube::new(Vec3::new(0.0, 0.0, 0.0), 2.0, mat);
 
         let ray_origin = Vec3::new(5.0, 5.0, 5.0);

@@ -10,7 +10,7 @@ mod renderer;
 mod sphere;
 mod texture;
 
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, Scale, Window, WindowOptions};
 use nalgebra_glm::Vec3;
 use std::f32::consts::PI;
 use std::sync::Arc;
@@ -22,20 +22,26 @@ use crate::cube::Cube;
 use crate::framebuffer::Framebuffer;
 use crate::light::Light;
 use crate::plane::Plane;
-use crate::ray_intersect::{Intersect, Material, RayIntersect};
+use crate::ray_intersect::{Material, Object};
 use crate::renderer::render;
 use crate::sphere::Sphere;
 use crate::texture::Texture;
 
-const WIDTH: usize = 800;
-const HEIGHT: usize = 600;
+const WIDTH: usize = 650;
+const HEIGHT: usize = 450;
 const ROTATION_SPEED: f32 = PI / 45.0;
 
 fn main() {
     let frame_delay = Duration::from_millis(16);
 
     let mut framebuffer = Framebuffer::new(WIDTH, HEIGHT);
-    let mut window = Window::new("Pyramid Ray Tracer", WIDTH, HEIGHT, WindowOptions::default()).unwrap();
+    let mut window = Window::new(
+        "Pyramid Ray Tracer",
+        WIDTH,
+        HEIGHT,
+        WindowOptions {  ..WindowOptions::default() }, // Escalado 2x de 400x300 a ventana 800x600
+    )
+    .unwrap();
 
     // Catálogo de materiales base
     let ivory = Material::new(Color::new(100, 100, 80), 50.0, [0.6, 0.3, 0.1]);
@@ -50,7 +56,7 @@ fn main() {
     let cube_mat = ivory.clone().with_texture(wall_texture);
 
     let cube_size = 0.8;
-    let mut objects: Vec<Box<dyn RayIntersect>> = Vec::new();
+    let mut objects: Vec<Object> = Vec::new();
 
     // Niveles de la pirámide: (nivel_index, radio)
     // Nivel 0 (más bajo): radio 2 -> 5x5 cubos
@@ -70,7 +76,7 @@ fn main() {
                 let is_outer = radius == 0 || x.abs() == radius || z.abs() == radius;
                 if is_outer {
                     let center = Vec3::new(x as f32 * cube_size, y, z as f32 * cube_size);
-                    objects.push(Box::new(Cube::new(center, cube_size, cube_mat.clone())));
+                    objects.push(Object::Cube(Cube::new(center, cube_size, cube_mat.clone())));
                 }
             }
         }
@@ -78,7 +84,7 @@ fn main() {
 
     // Plano / suelo debajo de la pirámide
     let floor_y = -1.5 * cube_size;
-    objects.push(Box::new(Plane::new_with_normal(
+    objects.push(Object::Plane(Plane::new_with_normal(
         Vec3::new(0.0, floor_y, 0.0),
         Vec3::new(0.0, 1.0, 0.0),
         16.0,

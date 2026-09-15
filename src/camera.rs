@@ -7,22 +7,40 @@ pub struct Camera {
     pub eye: Vec3,
     pub center: Vec3,
     pub up: Vec3,
+    forward: Vec3,
+    right: Vec3,
+    cam_up: Vec3,
 }
 
 impl Camera {
     pub fn new(eye: Vec3, center: Vec3, up: Vec3) -> Self {
-        Camera { eye, center, up }
+        let mut camera = Camera {
+            eye,
+            center,
+            up,
+            forward: Vec3::zeros(),
+            right: Vec3::zeros(),
+            cam_up: Vec3::zeros(),
+        };
+        camera.update_basis();
+        camera
     }
 
-    pub fn basis_change(&self, vector: &Vec3) -> Vec3 {
+    /// Actualiza la base ortonormal cuando la posición o el objetivo de la cámara cambian.
+    pub fn update_basis(&mut self) {
         let forward = (self.center - self.eye).normalize();
         let right = forward.cross(&self.up).normalize();
+        let cam_up = right.cross(&forward).normalize();
 
-        let up = right.cross(&forward).normalize();
+        self.forward = forward;
+        self.right = right;
+        self.cam_up = cam_up;
+    }
 
-        let rotated = vector.x * right + vector.y * up - vector.z * forward;
-
-        rotated.normalize()
+    /// Transforma una dirección desde el espacio de cámara al espacio de mundo.
+    #[inline]
+    pub fn basis_change(&self, vector: &Vec3) -> Vec3 {
+        vector.x * self.right + vector.y * self.cam_up - vector.z * self.forward
     }
 
     pub fn orbit(&mut self, delta_yaw: f32, delta_pitch: f32) {
@@ -43,5 +61,6 @@ impl Camera {
                 -radius * new_pitch.sin(),
                 radius * new_yaw.sin() * new_pitch.cos(),
             );
+        self.update_basis();
     }
 }
