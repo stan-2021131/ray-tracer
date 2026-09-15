@@ -9,6 +9,8 @@ use std::f32::consts::PI;
 pub const BACKGROUND_COLOR: u32 = 0x040C24;
 pub const FOV: f32 = PI / 3.0;
 pub const SHADOW_BIAS: f32 = 1e-3;
+pub const REFLECTION_BIAS: f32 = 1e-3;
+pub const MAX_DEPTH: u32 = 3;
 
 /// Calcula la dirección de reflexión especular de un rayo incidente sobre una normal.
 pub fn reflect(incident: &Vec3, normal: &Vec3) -> Vec3 {
@@ -71,7 +73,11 @@ pub fn cast_ray(
     ray_direction: &Vec3,
     objects: &[Box<dyn RayIntersect>],
     light: &Light,
+    depth: u32,
 ) -> Color {
+    if depth > MAX_DEPTH {
+        return Color::from_hex(BACKGROUND_COLOR);
+    }
     let mut closest: Option<Intersect> = None;
 
     for object in objects {
@@ -85,10 +91,23 @@ pub fn cast_ray(
         }
     }
 
-    match closest {
-        Some(intersect) => shade(&intersect, ray_origin, light, objects),
-        None => Color::from_hex(BACKGROUND_COLOR),
+    let Some(intersect) = closest else {
+        return Color::from_hex(BACKGROUND_COLOR);
+    };
+
+    let color = shade(&intersect, ray_origin, light, objects);
+
+    let reflectivity = intersect.material.albedo[2];
+
+    if reflectivity <= 0.0 {
+        return color;
     }
+
+    let reflect_direction = reflect(&-ray_direction, &intersect.normal);
+    let reflection_origin = intersect.point + intersect.normal * REFLECTION_BIAS;
+    let reflection_color = cast_ray(&reflection_origin, &reflect_direction, objects, light, depth + 1);
+
+    color * (1.0 - reflectivity) + reflection_color * reflectivity
 }
 
 /// Renderiza la escena completa de forma multihilo en el framebuffer.
@@ -133,7 +152,7 @@ pub fn render(
                         let ray_direction = normalize(&Vec3::new(screen_x, screen_y, -1.0));
                         let ray_direction = camera.basis_change(&ray_direction);
 
-                        *pixel = cast_ray(&camera.eye, &ray_direction, objects, light).to_hex();
+                        *pixel = cast_ray(&camera.eye, &ray_direction, objects, light, 0).to_hex();
                     }
                 }
             });

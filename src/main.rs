@@ -38,10 +38,10 @@ fn main() {
     let mut window = Window::new("Pyramid Ray Tracer", WIDTH, HEIGHT, WindowOptions::default()).unwrap();
 
     // Catálogo de materiales base
-    let ivory = Material::new(Color::new(100, 100, 80), 50.0, [0.6, 0.3]);
-    let _rubber = Material::new(Color::new(80, 0, 0), 10.0, [0.9, 0.1]);
-    let _cobalt = Material::new(Color::new(40, 80, 140), 80.0, [0.7, 0.4]);
-    let jade = Material::new(Color::new(60, 130, 100), 30.0, [0.8, 0.25]);
+    let ivory = Material::new(Color::new(100, 100, 80), 50.0, [0.6, 0.3, 0.1]);
+    let _rubber = Material::new(Color::new(80, 0, 0), 10.0, [0.9, 0.1, 0.0]);
+    let _cobalt = Material::new(Color::new(40, 80, 140), 80.0, [0.7, 0.4, 0.15]);
+    let jade = Material::new(Color::new(60, 130, 100), 30.0, [0.8, 0.25, 0.05]);
 
     // Catálogo de texturas
     let wall_texture = Arc::new(Texture::new("./textures/wall.png"));
