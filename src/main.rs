@@ -137,20 +137,17 @@ fn main() {
 
     let mut window = Window::new("Pyramid", WIDTH, HEIGHT, WindowOptions::default()).unwrap();
 
-    let _ivory = Material::new(Color::new(100, 100, 80), 50.0, [0.6, 0.3]);
+    // Catálogo de materiales base
+    let ivory = Material::new(Color::new(100, 100, 80), 50.0, [0.6, 0.3]);
     let _rubber = Material::new(Color::new(80, 0, 0), 10.0, [0.9, 0.1]);
     let _cobalt = Material::new(Color::new(40, 80, 140), 80.0, [0.7, 0.4]);
     let jade = Material::new(Color::new(60, 130, 100), 30.0, [0.8, 0.25]);
 
-    // Placeholder para la ruta de la textura (reemplazar por la ruta deseada, ej: "./textures/mi_textura.png")
-    const CUBE_TEXTURE_PATH: &str = "./textures/wall.png";
-    let cube_texture = Arc::new(Texture::new(CUBE_TEXTURE_PATH));
-    let textured_cube_mat = Material::new_with_texture(
-        Color::new(255, 255, 255),
-        50.0,
-        [0.8, 0.2],
-        cube_texture,
-    );
+    // Catálogo de texturas
+    let wall_texture = Arc::new(Texture::new("./textures/wall.png"));
+
+    // Composición: Material base + Textura
+    let cube_mat = ivory.clone().with_texture(wall_texture);
 
     let cube_size = 0.8;
     let mut objects: Vec<Box<dyn RayIntersect>> = Vec::new();
@@ -173,7 +170,7 @@ fn main() {
                 let is_outer = radius == 0 || x.abs() == radius || z.abs() == radius;
                 if is_outer {
                     let center = Vec3::new(x as f32 * cube_size, y, z as f32 * cube_size);
-                    objects.push(Box::new(Cube::new(center, cube_size, textured_cube_mat.clone())));
+                    objects.push(Box::new(Cube::new(center, cube_size, cube_mat.clone())));
                 }
             }
         }

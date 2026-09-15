@@ -35,10 +35,16 @@ impl Material {
         }
     }
 
-    /// Retorna el color difuso evaluado en coordenadas UV si tiene textura, o el color base.
+    /// Asigna una textura a este material retornando el material modificado (patrón Builder).
+    pub fn with_texture(mut self, texture: Arc<Texture>) -> Self {
+        self.texture = Some(texture);
+        self
+    }
+
+    /// Retorna el color difuso modulando el color base del material con la textura si existe.
     pub fn get_diffuse_color(&self, u: f32, v: f32) -> Color {
         if let Some(tex) = &self.texture {
-            tex.get_color(u, v)
+            self.diffuse * tex.get_color(u, v)
         } else {
             self.diffuse
         }
