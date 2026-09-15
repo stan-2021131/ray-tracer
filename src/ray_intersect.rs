@@ -21,20 +21,6 @@ impl Material {
         }
     }
 
-    pub fn new_with_texture(
-        diffuse: Color,
-        specular: f32,
-        albedo: [f32; 2],
-        texture: Arc<Texture>,
-    ) -> Self {
-        Material {
-            diffuse,
-            specular,
-            albedo,
-            texture: Some(texture),
-        }
-    }
-
     /// Asigna una textura a este material retornando el material modificado (patrón Builder).
     pub fn with_texture(mut self, texture: Arc<Texture>) -> Self {
         self.texture = Some(texture);
