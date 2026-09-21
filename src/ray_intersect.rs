@@ -6,20 +6,37 @@ use crate::texture::Texture;
 use nalgebra_glm::Vec3;
 use std::sync::Arc;
 
+/// Propiedades ópticas y físicas de una superficie en el trazado de rayos.
 #[derive(Debug, Clone)]
 pub struct Material {
-    pub diffuse: Color,
-    pub specular: f32,
-    pub albedo: [f32; 3],
+    pub color: Color,
+    pub diffuse: f32,           // Peso de reflexión difusa (Lambertiana)
+    pub specular: f32,          // Peso de brillo especular directo (Phong)
+    pub reflective: f32,        // Peso de reflexión especular indirecta (Espejo)
+    pub refractive: f32,        // Peso de refracción / transmisión (Transparencia)
+    pub shininess: f32,         // Exponente de brillo Phong
+    pub refractive_index: f32,  // Índice de refracción (IOR)
     pub texture: Option<Arc<Texture>>,
 }
 
 impl Material {
-    pub fn new(diffuse: Color, specular: f32, albedo: [f32; 3]) -> Self {
+    pub fn new(
+        color: Color,
+        diffuse: f32,
+        specular: f32,
+        reflective: f32,
+        refractive: f32,
+        shininess: f32,
+        refractive_index: f32,
+    ) -> Self {
         Material {
+            color,
             diffuse,
             specular,
-            albedo,
+            reflective,
+            refractive,
+            shininess,
+            refractive_index,
             texture: None,
         }
     }
@@ -30,25 +47,47 @@ impl Material {
         self
     }
 
-    /// Retorna el color difuso modulando el color base del material con la textura si existe.
+    /// Retorna el color modulando el color base del material con la textura si existe.
     #[inline]
-    pub fn get_diffuse_color(&self, u: f32, v: f32) -> Color {
+    pub fn get_color(&self, u: f32, v: f32) -> Color {
         if let Some(tex) = &self.texture {
-            self.diffuse * tex.get_color(u, v)
+            self.color * tex.get_color(u, v)
         } else {
-            self.diffuse
+            self.color
+        }
+    }
+
+    /// Convierte los datos del material en una estructura `Intersect` para el impacto de un rayo.
+    #[inline]
+    pub fn to_intersect(&self, point: Vec3, normal: Vec3, distance: f32, u: f32, v: f32) -> Intersect {
+        Intersect {
+            point,
+            normal,
+            distance,
+            color: self.get_color(u, v),
+            diffuse: self.diffuse,
+            specular: self.specular,
+            reflective: self.reflective,
+            refractive: self.refractive,
+            shininess: self.shininess,
+            refractive_index: self.refractive_index,
         }
     }
 }
 
+/// Información del punto de impacto de un rayo sobre una superficie.
 #[derive(Debug, Clone, Copy)]
 pub struct Intersect {
     pub point: Vec3,
     pub normal: Vec3,
     pub distance: f32,
-    pub diffuse_color: Color,
+    pub color: Color,
+    pub diffuse: f32,
     pub specular: f32,
-    pub albedo: [f32; 3],
+    pub reflective: f32,
+    pub refractive: f32,
+    pub shininess: f32,
+    pub refractive_index: f32,
 }
 
 pub trait RayIntersect: Sync + Send {

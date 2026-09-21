@@ -11,12 +11,55 @@ pub const BACKGROUND_COLOR: u32 = 0x040C24;
 pub const FOV: f32 = PI / 3.0;
 pub const SHADOW_BIAS: f32 = 1e-3;
 pub const REFLECTION_BIAS: f32 = 1e-3;
+pub const REFRACTION_BIAS: f32 = 1e-3;
 pub const MAX_DEPTH: u32 = 3;
 
 /// Calcula la dirección de reflexión especular de un rayo incidente sobre una normal.
 #[inline]
 pub fn reflect(incident: &Vec3, normal: &Vec3) -> Vec3 {
     incident - normal * (2.0 * dot(incident, normal))
+}
+
+/// Calcula la dirección del rayo refractado según la Ley de Snell.
+/// Retorna `None` en caso de Reflexión Interna Total (TIR).
+#[inline]
+pub fn refract(incident: &Vec3, normal: &Vec3, ior: f32) -> Option<Vec3> {
+    let mut cosi = -dot(incident, normal).clamp(-1.0, 1.0);
+    let mut eta_i = 1.0;
+    let mut eta_t = ior;
+    let mut n = *normal;
+
+    if cosi < 0.0 {
+        // Rayo saliendo del interior del objeto hacia el aire
+        cosi = -cosi;
+        std::mem::swap(&mut eta_i, &mut eta_t);
+        n = -normal;
+    }
+
+    let eta = eta_i / eta_t;
+    let k = 1.0 - eta * eta * (1.0 - cosi * cosi);
+
+    if k < 0.0 {
+        None // Reflexión Interna Total
+    } else {
+        Some(incident * eta + n * (eta * cosi - k.sqrt()))
+    }
+}
+
+/// Coeficiente de Fresnel usando la aproximación de Schlick (fracción de luz reflejada vs refractada).
+#[inline]
+pub fn fresnel(incident: &Vec3, normal: &Vec3, ior: f32) -> f32 {
+    let mut cosi = -dot(incident, normal).clamp(-1.0, 1.0);
+    let mut eta_i = 1.0;
+    let mut eta_t = ior;
+
+    if cosi < 0.0 {
+        cosi = -cosi;
+        std::mem::swap(&mut eta_i, &mut eta_t);
+    }
+
+    let r0 = ((eta_i - eta_t) / (eta_i + eta_t)).powi(2);
+    r0 + (1.0 - r0) * (1.0 - cosi).powi(5)
 }
 
 /// Comprueba si el punto de intersección está bloqueado respecto a la fuente de luz por otro objeto.
@@ -34,7 +77,7 @@ pub fn cast_shadow(
     })
 }
 
-/// Calcula el sombreado Phong (difuso + especular) teniendo en cuenta las sombras arrojadas.
+/// Calcula el sombreado Phong directo (difuso + brillo especular) teniendo en cuenta sombras.
 pub fn shade(
     intersect: &Intersect,
     ray_origin: &Vec3,
@@ -50,8 +93,8 @@ pub fn shade(
 
     // Componente difusa (Lambertiana)
     let diffuse_intensity = dot(&intersect.normal, &light_direction).max(0.0);
-    let diffuse = intersect.diffuse_color
-        * (diffuse_intensity * intersect.albedo[0] * light.intensity * shadow_factor);
+    let diffuse = intersect.color
+        * (diffuse_intensity * intersect.diffuse * light.intensity * shadow_factor);
 
     // Componente especular (Phong)
     let specular = if in_shadow {
@@ -60,22 +103,15 @@ pub fn shade(
         let reflect_direction = reflect(&-light_direction, &intersect.normal);
         let specular_intensity = dot(&view_direction, &reflect_direction)
             .max(0.0)
-            .powf(intersect.specular);
-        light.color * (specular_intensity * intersect.albedo[1] * light.intensity)
+            .powf(intersect.shininess);
+        light.color * (specular_intensity * intersect.specular * light.intensity)
     };
 
     diffuse + specular
 }
 
 /// Dispara un rayo en la escena y retorna el color del objeto impactado o el fondo / Skybox.
-///
-/// # Integración del Skybox:
-/// - Si el rayo no intersecta ningún objeto de la escena (o excede MAX_DEPTH), se muestrea el color
-///   del Skybox usando únicamente la dirección tridimensional del rayo.
-/// - La posición de origen del rayo no afecta el color del skybox (simulando una bóveda celeste en el infinito).
-/// - El skybox no recibe sombras, iluminación difusa ni atenuación de materiales.
-/// - Funciona de forma idéntica y consistente para rayos primarios (cámara) y rayos secundarios (reflexión/refracción).
-/// - Si `skybox` es `None`, se utiliza el color de fondo estático `BACKGROUND_COLOR` como respaldo.
+/// Integra iluminación directa, sombras, reflexión especular, refracción y efecto Fresnel.
 pub fn cast_ray(
     ray_origin: &Vec3,
     ray_direction: &Vec3,
@@ -108,26 +144,70 @@ pub fn cast_ray(
             .unwrap_or_else(|| Color::from_hex(BACKGROUND_COLOR));
     };
 
-    let color = shade(&intersect, ray_origin, light, objects);
+    // 1. Iluminación directa local
+    let direct_color = shade(&intersect, ray_origin, light, objects);
 
-    let reflectivity = intersect.albedo[2];
-
-    if reflectivity <= 0.0 {
-        return color;
+    // Retorno rápido si el material no es reflectivo ni transparente
+    if intersect.reflective <= 0.0 && intersect.refractive <= 0.0 {
+        return direct_color;
     }
 
-    let reflect_direction = reflect(&-ray_direction, &intersect.normal);
-    let reflection_origin = intersect.point + intersect.normal * REFLECTION_BIAS;
-    let reflection_color = cast_ray(
-        &reflection_origin,
-        &reflect_direction,
-        objects,
-        light,
-        skybox,
-        depth + 1,
-    );
+    // 2. Coeficiente de Fresnel para materiales transparentes/reflectivos
+    let kr = if intersect.refractive > 0.0 {
+        fresnel(ray_direction, &intersect.normal, intersect.refractive_index)
+    } else {
+        1.0
+    };
 
-    color * (1.0 - reflectivity) + reflection_color * reflectivity
+    // 3. Rayo de Reflexión
+    let mut reflection_color = Color::new(0, 0, 0);
+    let reflect_weight = intersect.reflective + intersect.refractive * kr;
+    if reflect_weight > 0.0 {
+        let reflect_dir = reflect(ray_direction, &intersect.normal);
+        let reflect_orig = if dot(ray_direction, &intersect.normal) < 0.0 {
+            intersect.point + intersect.normal * REFLECTION_BIAS
+        } else {
+            intersect.point - intersect.normal * REFLECTION_BIAS
+        };
+        reflection_color = cast_ray(
+            &reflect_orig,
+            &reflect_dir,
+            objects,
+            light,
+            skybox,
+            depth + 1,
+        );
+    }
+
+    // 4. Rayo de Refracción
+    let mut refraction_color = Color::new(0, 0, 0);
+    let refract_weight = intersect.refractive * (1.0 - kr);
+    if refract_weight > 0.0 {
+        if let Some(refract_dir) = refract(ray_direction, &intersect.normal, intersect.refractive_index) {
+            let refract_orig = if dot(ray_direction, &intersect.normal) < 0.0 {
+                intersect.point - intersect.normal * REFRACTION_BIAS
+            } else {
+                intersect.point + intersect.normal * REFRACTION_BIAS
+            };
+            refraction_color = cast_ray(
+                &refract_orig,
+                &refract_dir,
+                objects,
+                light,
+                skybox,
+                depth + 1,
+            );
+        } else {
+            // En Reflexión Interna Total (TIR), la energía refractada se refleja completamente
+            refraction_color = reflection_color;
+        }
+    }
+
+    // Combinación ponderada de iluminación directa, reflexión y refracción
+    let reflect_contrib = reflection_color * (intersect.reflective * kr + if intersect.refractive > 0.0 { intersect.refractive * kr } else { 0.0 });
+    let refract_contrib = refraction_color * refract_weight;
+
+    direct_color + reflect_contrib + refract_contrib
 }
 
 /// Renderiza la escena completa de forma multihilo en el framebuffer.
@@ -187,4 +267,47 @@ pub fn render(
             });
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normal_incidence_refraction() {
+        // Rayo entrando perpendicularmente a la superficie (0, -1, 0) sobre normal (0, 1, 0)
+        let incident = Vec3::new(0.0, -1.0, 0.0);
+        let normal = Vec3::new(0.0, 1.0, 0.0);
+        let refracted = refract(&incident, &normal, 1.5).unwrap();
+        // Debe continuar en la misma dirección (0, -1, 0)
+        assert!((refracted.x).abs() < 1e-4);
+        assert!((refracted.y - (-1.0)).abs() < 1e-4);
+        assert!((refracted.z).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_total_internal_reflection() {
+        // Rayo saliendo de vidrio (IOR 1.5) al aire con ángulo mayor al ángulo crítico (~41.8°)
+        // Ángulo de 60 grados: (sin(60°), cos(60°), 0)
+        let angle: f32 = 60.0_f32.to_radians();
+        let incident = Vec3::new(angle.sin(), angle.cos(), 0.0);
+        let normal = Vec3::new(0.0, 1.0, 0.0); // Saliendo (incident . normal > 0)
+        let refracted = refract(&incident, &normal, 1.5);
+        // Debe ser None debido a Reflexión Interna Total
+        assert!(refracted.is_none());
+    }
+
+    #[test]
+    fn test_fresnel_values() {
+        let normal = Vec3::new(0.0, 1.0, 0.0);
+        // Incidencia normal (0 grados): R0 = ((1 - 1.5)/(1 + 1.5))^2 = (0.5/2.5)^2 = 0.04 (4% de reflexión)
+        let incident_normal = Vec3::new(0.0, -1.0, 0.0);
+        let kr_normal = fresnel(&incident_normal, &normal, 1.5);
+        assert!((kr_normal - 0.04).abs() < 1e-3);
+
+        // Ángulo rasante (casi 90 grados): kr tiende a 1.0 (100% de reflexión)
+        let incident_grazing = Vec3::new(0.999, -0.001, 0.0).normalize();
+        let kr_grazing = fresnel(&incident_grazing, &normal, 1.5);
+        assert!(kr_grazing > 0.95);
+    }
 }

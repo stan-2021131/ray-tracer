@@ -164,16 +164,7 @@ impl RayIntersect for Cube {
 
         let point = ray_origin + ray_direction * t;
         let (u, v) = self.get_uv(&point, &normal);
-        let diffuse_color = self.material.get_diffuse_color(u, v);
-
-        Some(Intersect {
-            point,
-            normal,
-            distance: t,
-            diffuse_color,
-            specular: self.material.specular,
-            albedo: self.material.albedo,
-        })
+        Some(self.material.to_intersect(point, normal, t, u, v))
     }
 
     fn ray_intersect_distance(&self, ray_origin: &Vec3, ray_direction: &Vec3, max_distance: f32) -> bool {
@@ -224,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_slab_front_intersection() {
-        let mat = Material::new(Color::new(255, 0, 0), 10.0, [0.8, 0.2, 0.0]);
+        let mat = crate::materials::diffuse(Color::new(255, 0, 0));
         let cube = Cube::new(Vec3::new(0.0, 0.0, 0.0), 2.0, mat);
 
         let ray_origin = Vec3::new(0.0, 0.0, 5.0);
@@ -238,7 +229,7 @@ mod tests {
 
     #[test]
     fn test_slab_miss() {
-        let mat = Material::new(Color::new(255, 0, 0), 10.0, [0.8, 0.2, 0.0]);
+        let mat = crate::materials::diffuse(Color::new(255, 0, 0));
         let cube = Cube::new(Vec3::new(0.0, 0.0, 0.0), 2.0, mat);
 
         let ray_origin = Vec3::new(5.0, 5.0, 5.0);

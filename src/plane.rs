@@ -95,16 +95,8 @@ impl RayIntersect for Plane {
 
         let u_coord = (u_proj / self.width) + 0.5;
         let v_coord = (v_proj / self.height) + 0.5;
-        let diffuse_color = self.material.get_diffuse_color(u_coord, v_coord);
 
-        Some(Intersect {
-            point,
-            normal,
-            distance: t,
-            diffuse_color,
-            specular: self.material.specular,
-            albedo: self.material.albedo,
-        })
+        Some(self.material.to_intersect(point, normal, t, u_coord, v_coord))
     }
 
     fn ray_intersect_distance(&self, ray_origin: &Vec3, ray_direction: &Vec3, max_distance: f32) -> bool {
