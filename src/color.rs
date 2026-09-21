@@ -1,18 +1,20 @@
 use std::fmt;
 use std::ops::{Add, Mul};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
 }
 
 impl Color {
+    #[inline]
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Color { r, g, b }
     }
 
+    #[inline]
     pub fn from_hex(hex: u32) -> Self {
         Color {
             r: ((hex >> 16) & 0xFF) as u8,
@@ -21,8 +23,21 @@ impl Color {
         }
     }
 
+    #[inline]
     pub fn to_hex(&self) -> u32 {
         ((self.r as u32) << 16) | ((self.g as u32) << 8) | (self.b as u32)
+    }
+
+    /// Interpola linealmente entre dos colores según el factor t en [0.0, 1.0].
+    #[allow(dead_code)]
+    #[inline]
+    pub fn lerp(self, other: Color, t: f32) -> Self {
+        let t = t.clamp(0.0, 1.0);
+        let one_minus_t = 1.0 - t;
+        let r = (self.r as f32 * one_minus_t + other.r as f32 * t).round() as u8;
+        let g = (self.g as f32 * one_minus_t + other.g as f32 * t).round() as u8;
+        let b = (self.b as f32 * one_minus_t + other.b as f32 * t).round() as u8;
+        Color { r, g, b }
     }
 }
 

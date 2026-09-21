@@ -3,6 +3,7 @@ use crate::color::Color;
 use crate::framebuffer::Framebuffer;
 use crate::light::Light;
 use crate::ray_intersect::{Intersect, Object, RayIntersect};
+use crate::skybox::Skybox;
 use nalgebra_glm::{dot, normalize, Vec3};
 use std::f32::consts::PI;
 
@@ -13,6 +14,7 @@ pub const REFLECTION_BIAS: f32 = 1e-3;
 pub const MAX_DEPTH: u32 = 3;
 
 /// Calcula la dirección de reflexión especular de un rayo incidente sobre una normal.
+#[inline]
 pub fn reflect(incident: &Vec3, normal: &Vec3) -> Vec3 {
     incident - normal * (2.0 * dot(incident, normal))
 }
@@ -65,16 +67,27 @@ pub fn shade(
     diffuse + specular
 }
 
-/// Dispara un rayo en la escena y retorna el color del objeto más cercano o el fondo.
+/// Dispara un rayo en la escena y retorna el color del objeto impactado o el fondo / Skybox.
+///
+/// # Integración del Skybox:
+/// - Si el rayo no intersecta ningún objeto de la escena (o excede MAX_DEPTH), se muestrea el color
+///   del Skybox usando únicamente la dirección tridimensional del rayo.
+/// - La posición de origen del rayo no afecta el color del skybox (simulando una bóveda celeste en el infinito).
+/// - El skybox no recibe sombras, iluminación difusa ni atenuación de materiales.
+/// - Funciona de forma idéntica y consistente para rayos primarios (cámara) y rayos secundarios (reflexión/refracción).
+/// - Si `skybox` es `None`, se utiliza el color de fondo estático `BACKGROUND_COLOR` como respaldo.
 pub fn cast_ray(
     ray_origin: &Vec3,
     ray_direction: &Vec3,
     objects: &[Object],
     light: &Light,
+    skybox: Option<&Skybox>,
     depth: u32,
 ) -> Color {
     if depth > MAX_DEPTH {
-        return Color::from_hex(BACKGROUND_COLOR);
+        return skybox
+            .map(|sb| sb.sample(ray_direction))
+            .unwrap_or_else(|| Color::from_hex(BACKGROUND_COLOR));
     }
     let mut closest: Option<Intersect> = None;
 
@@ -90,7 +103,9 @@ pub fn cast_ray(
     }
 
     let Some(intersect) = closest else {
-        return Color::from_hex(BACKGROUND_COLOR);
+        return skybox
+            .map(|sb| sb.sample(ray_direction))
+            .unwrap_or_else(|| Color::from_hex(BACKGROUND_COLOR));
     };
 
     let color = shade(&intersect, ray_origin, light, objects);
@@ -103,7 +118,14 @@ pub fn cast_ray(
 
     let reflect_direction = reflect(&-ray_direction, &intersect.normal);
     let reflection_origin = intersect.point + intersect.normal * REFLECTION_BIAS;
-    let reflection_color = cast_ray(&reflection_origin, &reflect_direction, objects, light, depth + 1);
+    let reflection_color = cast_ray(
+        &reflection_origin,
+        &reflect_direction,
+        objects,
+        light,
+        skybox,
+        depth + 1,
+    );
 
     color * (1.0 - reflectivity) + reflection_color * reflectivity
 }
@@ -114,6 +136,7 @@ pub fn render(
     objects: &[Object],
     camera: &Camera,
     light: &Light,
+    skybox: Option<&Skybox>,
 ) {
     let width = framebuffer.width as f32;
     let height = framebuffer.height as f32;
@@ -150,7 +173,15 @@ pub fn render(
                         let ray_direction = normalize(&Vec3::new(screen_x, screen_y, -1.0));
                         let ray_direction = camera.basis_change(&ray_direction);
 
-                        *pixel = cast_ray(&camera.eye, &ray_direction, objects, light, 0).to_hex();
+                        *pixel = cast_ray(
+                            &camera.eye,
+                            &ray_direction,
+                            objects,
+                            light,
+                            skybox,
+                            0,
+                        )
+                        .to_hex();
                     }
                 }
             });
