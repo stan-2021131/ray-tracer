@@ -1,35 +1,49 @@
 #![allow(dead_code)]
 
+use crate::color::Color;
 use crate::cube::Cube;
+use crate::light::Light;
 use crate::materials;
 use crate::plane::Plane;
 use crate::ray_intersect::Object;
 use crate::sphere::Sphere;
 use nalgebra_glm::Vec3;
 
+/// Representa una escena 3D completa: colección de objetos geométricos y fuentes de luz.
+pub struct Scene {
+    pub objects: Vec<Object>,
+    pub lights: Vec<Light>,
+}
+
+impl Scene {
+    pub fn new(objects: Vec<Object>, lights: Vec<Light>) -> Self {
+        Scene { objects, lights }
+    }
+}
+
 /// Escena completa: Pirámide escalonada de cubos texturizados, suelo de jade y dos esferas (espejo y vidrio).
-pub fn pyramid_with_spheres_scene() -> Vec<Object> {
-    let mut objects = pyramid_only_scene();
+pub fn pyramid_with_spheres_scene() -> Scene {
+    let mut scene = pyramid_only_scene();
 
     // Esfera espejo reflectiva (derecha)
-    objects.push(Object::Sphere(Sphere::new(
+    scene.objects.push(Object::Sphere(Sphere::new(
         Vec3::new(1.8, 0.0, 1.2),
         0.65,
         materials::mirror(),
     )));
 
     // Esfera de vidrio transparente y refractiva (izquierda)
-    objects.push(Object::Sphere(Sphere::new(
+    scene.objects.push(Object::Sphere(Sphere::new(
         Vec3::new(-1.8, 0.0, 1.2),
         0.65,
         materials::glass(),
     )));
 
-    objects
+    scene
 }
 
-/// Escena de pirámide: Solo la pirámide de cubos exterior sobre el plano de suelo.
-pub fn pyramid_only_scene() -> Vec<Object> {
+/// Escena de pirámide: Solo la pirámide de cubos exterior sobre el plano de suelo con luces principal y de relleno.
+pub fn pyramid_only_scene() -> Scene {
     let cube_mat = materials::textured_wall("./textures/wall.png");
     let floor_mat = materials::jade();
     let cube_size = 0.8;
@@ -65,11 +79,17 @@ pub fn pyramid_only_scene() -> Vec<Object> {
         floor_mat,
     )));
 
-    objects
+    // Configuración de iluminación para la pirámide (Luz clave blanca + Luz de relleno cálida)
+    let lights = vec![
+        Light::new(Vec3::new(5.0, 6.0, 10.0), Color::new(255, 255, 255), 1.3),
+        Light::new(Vec3::new(-6.0, 4.0, 4.0), Color::new(220, 230, 255), 0.5),
+    ];
+
+    Scene::new(objects, lights)
 }
 
-/// Escena de esferas: Muestra de materiales (espejo, vidrio, oro, cobalto, marfil) sobre suelo.
-pub fn spheres_scene() -> Vec<Object> {
+/// Escena de esferas: Muestra de materiales (espejo, vidrio, oro, cobalto, marfil) con iluminación ambiental y de contraste.
+pub fn spheres_scene() -> Scene {
     let mut objects: Vec<Object> = Vec::new();
 
     // Suelo reflectivo suave
@@ -116,5 +136,15 @@ pub fn spheres_scene() -> Vec<Object> {
         materials::ivory(),
     )));
 
-    objects
+    // Configuración de iluminación para la galería de esferas (3 luces con colores y ángulos distintos):
+    // 1. Luz principal frontal-derecha blanca (iluminación clave y sombras definidas)
+    // 2. Luz de relleno lateral izquierda cian / azul fría (resalta reflejos y refracciones del vidrio)
+    // 3. Contraluz trasera magenta / ámbar cálida (crea efecto de borde / rim light en las siluetas)
+    let lights = vec![
+        Light::new(Vec3::new(4.0, 7.0, 5.0), Color::new(255, 255, 255), 1.1),
+        Light::new(Vec3::new(-6.0, 4.0, 3.0), Color::new(80, 190, 255), 0.7),
+        Light::new(Vec3::new(0.0, 5.0, -5.0), Color::new(255, 120, 180), 0.8),
+    ];
+
+    Scene::new(objects, lights)
 }

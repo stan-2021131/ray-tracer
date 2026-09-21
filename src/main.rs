@@ -56,12 +56,10 @@ fn main() {
     .with_filter(TextureFilter::Nearest);
 
     // ==========================================
-    // 2. SELECCIÓN DE ESCENA
+    // 2. SELECCIÓN DE ESCENA (OBJETOS Y LUCES)
     // ==========================================
-    // Opciones disponibles en scene.rs         -> Galería de esferas (vidrio, espejo, oro, etc.)
-    let objects = scene::pyramid_only_scene();
-
-    let light = Light::new(Vec3::new(5.0, 6.0, 10.0), Color::new(255, 255, 255), 1.5);
+    // Opciones disponibles en scene.rs
+    let scene = scene::spheres_scene();
 
     let mut camera = Camera::new(
         Vec3::new(0.0, 2.0, 6.0),
@@ -90,7 +88,13 @@ fn main() {
         }
 
         if camera_moved {
-            render(&mut framebuffer, &objects, &camera, &light, Some(&skybox));
+            render(
+                &mut framebuffer,
+                &scene.objects,
+                &camera,
+                &scene.lights,
+                Some(&skybox),
+            );
             camera_moved = false;
         }
 

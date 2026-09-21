@@ -77,46 +77,52 @@ pub fn cast_shadow(
     })
 }
 
-/// Calcula el sombreado Phong directo (difuso + brillo especular) teniendo en cuenta sombras.
+/// Calcula el sombreado Phong directo (difuso + brillo especular) acumulando la contribución de múltiples luces.
 pub fn shade(
     intersect: &Intersect,
     ray_origin: &Vec3,
-    light: &Light,
+    lights: &[Light],
     objects: &[Object],
 ) -> Color {
-    let light_direction = (light.position - intersect.point).normalize();
     let view_direction = (ray_origin - intersect.point).normalize();
+    let mut total_color = Color::new(0, 0, 0);
 
-    // Verificación de sombra
-    let in_shadow = cast_shadow(intersect, &light_direction, light, objects);
-    let shadow_factor = if in_shadow { 0.1 } else { 1.0 };
+    for light in lights {
+        let light_direction = (light.position - intersect.point).normalize();
 
-    // Componente difusa (Lambertiana)
-    let diffuse_intensity = dot(&intersect.normal, &light_direction).max(0.0);
-    let diffuse = intersect.color
-        * (diffuse_intensity * intersect.diffuse * light.intensity * shadow_factor);
+        // Verificación de sombra para esta luz específica
+        let in_shadow = cast_shadow(intersect, &light_direction, light, objects);
+        let shadow_factor = if in_shadow { 0.1 } else { 1.0 };
 
-    // Componente especular (Phong)
-    let specular = if in_shadow {
-        Color::new(0, 0, 0)
-    } else {
-        let reflect_direction = reflect(&-light_direction, &intersect.normal);
-        let specular_intensity = dot(&view_direction, &reflect_direction)
-            .max(0.0)
-            .powf(intersect.shininess);
-        light.color * (specular_intensity * intersect.specular * light.intensity)
-    };
+        // Componente difusa (Lambertiana)
+        let diffuse_intensity = dot(&intersect.normal, &light_direction).max(0.0);
+        let diffuse = intersect.color
+            * (diffuse_intensity * intersect.diffuse * light.intensity * shadow_factor);
 
-    diffuse + specular
+        // Componente especular (Phong)
+        let specular = if in_shadow {
+            Color::new(0, 0, 0)
+        } else {
+            let reflect_direction = reflect(&-light_direction, &intersect.normal);
+            let specular_intensity = dot(&view_direction, &reflect_direction)
+                .max(0.0)
+                .powf(intersect.shininess);
+            light.color * (specular_intensity * intersect.specular * light.intensity)
+        };
+
+        total_color = total_color + diffuse + specular;
+    }
+
+    total_color
 }
 
 /// Dispara un rayo en la escena y retorna el color del objeto impactado o el fondo / Skybox.
-/// Integra iluminación directa, sombras, reflexión especular, refracción y efecto Fresnel.
+/// Integra iluminación directa de múltiples luces, sombras, reflexión especular, refracción y efecto Fresnel.
 pub fn cast_ray(
     ray_origin: &Vec3,
     ray_direction: &Vec3,
     objects: &[Object],
-    light: &Light,
+    lights: &[Light],
     skybox: Option<&Skybox>,
     depth: u32,
 ) -> Color {
@@ -144,8 +150,8 @@ pub fn cast_ray(
             .unwrap_or_else(|| Color::from_hex(BACKGROUND_COLOR));
     };
 
-    // 1. Iluminación directa local
-    let direct_color = shade(&intersect, ray_origin, light, objects);
+    // 1. Iluminación directa acumulada de todas las luces
+    let direct_color = shade(&intersect, ray_origin, lights, objects);
 
     // Retorno rápido si el material no es reflectivo ni transparente
     if intersect.reflective <= 0.0 && intersect.refractive <= 0.0 {
@@ -173,7 +179,7 @@ pub fn cast_ray(
             &reflect_orig,
             &reflect_dir,
             objects,
-            light,
+            lights,
             skybox,
             depth + 1,
         );
@@ -193,7 +199,7 @@ pub fn cast_ray(
                 &refract_orig,
                 &refract_dir,
                 objects,
-                light,
+                lights,
                 skybox,
                 depth + 1,
             );
@@ -215,7 +221,7 @@ pub fn render(
     framebuffer: &mut Framebuffer,
     objects: &[Object],
     camera: &Camera,
-    light: &Light,
+    lights: &[Light],
     skybox: Option<&Skybox>,
 ) {
     let width = framebuffer.width as f32;
@@ -257,7 +263,7 @@ pub fn render(
                             &camera.eye,
                             &ray_direction,
                             objects,
-                            light,
+                            lights,
                             skybox,
                             0,
                         )
