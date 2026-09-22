@@ -177,12 +177,15 @@ impl Camera {
                     }
                 }
                 Object::Box3D(b) => {
-                    // Verificación AABB expandida por el radio del jugador
-                    let min = b.min - Vec3::new(r, r, r);
-                    let max = b.max + Vec3::new(r, r, r);
-                    if pos.x >= min.x && pos.x <= max.x
-                        && pos.y >= min.y && pos.y <= max.y
-                        && pos.z >= min.z && pos.z <= max.z
+                    // Verificación OBB en espacio local de la caja expandida por el radio del jugador
+                    let local_pos = if b.is_rotated {
+                        b.inv_rot_mat * (pos - b.center)
+                    } else {
+                        pos - b.center
+                    };
+                    if local_pos.x.abs() <= (b.half_size.x + r)
+                        && local_pos.y.abs() <= (b.half_size.y + r)
+                        && local_pos.z.abs() <= (b.half_size.z + r)
                     {
                         return true;
                     }

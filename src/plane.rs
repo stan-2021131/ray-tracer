@@ -96,7 +96,13 @@ impl RayIntersect for Plane {
         let u_coord = (u_proj / self.width) + 0.5;
         let v_coord = (v_proj / self.height) + 0.5;
 
-        Some(self.material.to_intersect(point, normal, t, u_coord, v_coord))
+        // Soporte de transparencia Alpha Cutout: si el píxel de la textura es transparente, el rayo continúa
+        let color = self.material.get_color(u_coord, v_coord);
+        if color.a < 128 {
+            return None;
+        }
+
+        Some(self.material.to_intersect_with_color(point, normal, t, color))
     }
 
     fn ray_intersect_distance(&self, ray_origin: &Vec3, ray_direction: &Vec3, max_distance: f32) -> bool {
@@ -119,6 +125,60 @@ impl RayIntersect for Plane {
         let u_proj = dot(&d, &self.u);
         let v_proj = dot(&d, &self.v);
 
-        u_proj.abs() <= self.half_w && v_proj.abs() <= self.half_h
+        if u_proj.abs() > self.half_w || v_proj.abs() > self.half_h {
+            return false;
+        }
+
+        // Si la textura tiene zonas transparentes, la sombra tampoco se proyecta
+        if self.material.texture.is_some() {
+            let u_coord = (u_proj / self.width) + 0.5;
+            let v_coord = (v_proj / self.height) + 0.5;
+            if self.material.get_color(u_coord, v_coord).a < 128 {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::color::Color;
+    use crate::materials;
+    use crate::texture::Texture;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_plane_intersection_and_alpha_cutout() {
+        // Textura 2x2: píxel (0,0) transparente (alfa = 0), píxel (1,1) opaco rojo (alfa = 255)
+        let buffer = vec![
+            Color::new_rgba(0, 0, 0, 0),       // u < 0.5, v < 0.5 -> transparente
+            Color::new_rgba(255, 0, 0, 255),
+            Color::new_rgba(255, 0, 0, 255),
+            Color::new_rgba(255, 0, 0, 255),
+        ];
+        let tex = Arc::new(Texture { width: 2, height: 2, buffer });
+        let mat = materials::diffuse(Color::new(255, 255, 255)).with_texture(tex);
+
+        let plane = Plane::new_with_normal(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            2.0,
+            2.0,
+            mat,
+        );
+
+        // Rayo hacia zona transparente (esquina inferior izquierda: x = -0.5, y = -0.5)
+        let ray_origin_transparent = Vec3::new(-0.5, -0.5, 5.0);
+        let ray_dir = Vec3::new(0.0, 0.0, -1.0);
+        assert!(plane.ray_intersect(&ray_origin_transparent, &ray_dir).is_none());
+
+        // Rayo hacia zona opaca (esquina superior derecha: x = 0.5, y = 0.5)
+        let ray_origin_opaque = Vec3::new(0.5, 0.5, 5.0);
+        let hit = plane.ray_intersect(&ray_origin_opaque, &ray_dir);
+        assert!(hit.is_some());
+        assert_eq!(hit.unwrap().color.r, 255);
     }
 }

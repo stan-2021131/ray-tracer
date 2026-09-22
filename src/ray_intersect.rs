@@ -79,11 +79,17 @@ impl Material {
     /// Convierte los datos del material en una estructura `Intersect` para el impacto de un rayo.
     #[inline]
     pub fn to_intersect(&self, point: Vec3, normal: Vec3, distance: f32, u: f32, v: f32) -> Intersect {
+        self.to_intersect_with_color(point, normal, distance, self.get_color(u, v))
+    }
+
+    /// Convierte los datos del material en una estructura `Intersect` usando un color ya calculado (evita recalcular texturas).
+    #[inline]
+    pub fn to_intersect_with_color(&self, point: Vec3, normal: Vec3, distance: f32, color: Color) -> Intersect {
         Intersect {
             point,
             normal,
             distance,
-            color: self.get_color(u, v),
+            color,
             diffuse: self.diffuse,
             specular: self.specular,
             reflective: self.reflective,

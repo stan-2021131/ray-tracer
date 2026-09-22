@@ -10,17 +10,17 @@ pub struct Texture {
 
 impl Texture {
     /// Carga una textura desde un archivo de imagen (PNG, JPG, etc.).
-    /// Si el archivo no existe o falla la carga, genera una textura placeholder visible de respaldo.
+    /// Lee el canal Alfa para soportar recortes de transparencia nativos (Alpha Cutout).
     pub fn new(path: &str) -> Self {
         match image::open(path) {
             Ok(img) => {
-                let rgb = img.to_rgb8();
-                let (width, height) = rgb.dimensions();
-                let buffer = rgb
+                let rgba = img.to_rgba8();
+                let (width, height) = rgba.dimensions();
+                let buffer = rgba
                     .pixels()
                     .map(|p| {
-                        let [r, g, b] = p.0;
-                        Color::new(r, g, b)
+                        let [r, g, b, a] = p.0;
+                        Color::new_rgba(r, g, b, a)
                     })
                     .collect();
                 Texture {
@@ -73,12 +73,14 @@ impl Texture {
     }
 
     /// Muestrea la textura usando coordenadas normalizadas (u, v) en el rango [0.0, 1.0] o repetidas si u,v > 1.0.
+    #[allow(dead_code)]
     #[inline]
     pub fn get_color(&self, u: f32, v: f32) -> Color {
         self.get_color_nearest_wrap(u, v, TextureWrap::Repeat)
     }
 
     /// Muestreo por vecino más cercano (Nearest Neighbor Sampling) con modo de envoltura UV.
+    #[allow(dead_code)]
     #[inline]
     pub fn get_color_nearest(&self, u: f32, v: f32) -> Color {
         self.get_color_nearest_wrap(u, v, TextureWrap::Repeat)
@@ -158,7 +160,11 @@ impl Texture {
         let b_bot = c01.b as f32 * one_minus_fx + c11.b as f32 * fx;
         let b = (b_top * one_minus_fy + b_bot * fy).round().clamp(0.0, 255.0) as u8;
 
-        Color::new(r, g, b)
+        let a_top = c00.a as f32 * one_minus_fx + c10.a as f32 * fx;
+        let a_bot = c01.a as f32 * one_minus_fx + c11.a as f32 * fx;
+        let a = (a_top * one_minus_fy + a_bot * fy).round().clamp(0.0, 255.0) as u8;
+
+        Color::new_rgba(r, g, b, a)
     }
 
     /// Muestrea la textura utilizando el modo de filtrado y envoltura indicados.
@@ -171,6 +177,7 @@ impl Texture {
     }
 
     /// Muestrea la textura con filtrado y modo de envoltura explícitos.
+    #[allow(dead_code)]
     #[inline]
     pub fn get_color_wrapped(&self, u: f32, v: f32, wrap: TextureWrap, filter: TextureFilter) -> Color {
         match filter {

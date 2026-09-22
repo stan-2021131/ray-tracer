@@ -6,12 +6,18 @@ pub struct Color {
     pub r: u8,
     pub g: u8,
     pub b: u8,
+    pub a: u8, // Canal alfa (255 = opaco, 0 = transparente)
 }
 
 impl Color {
     #[inline]
     pub fn new(r: u8, g: u8, b: u8) -> Self {
-        Color { r, g, b }
+        Color { r, g, b, a: 255 }
+    }
+
+    #[inline]
+    pub fn new_rgba(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Color { r, g, b, a }
     }
 
     #[inline]
@@ -20,6 +26,7 @@ impl Color {
             r: ((hex >> 16) & 0xFF) as u8,
             g: ((hex >> 8) & 0xFF) as u8,
             b: (hex & 0xFF) as u8,
+            a: 255,
         }
     }
 
@@ -37,7 +44,8 @@ impl Color {
         let r = (self.r as f32 * one_minus_t + other.r as f32 * t).round() as u8;
         let g = (self.g as f32 * one_minus_t + other.g as f32 * t).round() as u8;
         let b = (self.b as f32 * one_minus_t + other.b as f32 * t).round() as u8;
-        Color { r, g, b }
+        let a = (self.a as f32 * one_minus_t + other.a as f32 * t).round() as u8;
+        Color { r, g, b, a }
     }
 }
 
@@ -49,6 +57,7 @@ impl Add for Color {
             r: self.r.saturating_add(other.r),
             g: self.g.saturating_add(other.g),
             b: self.b.saturating_add(other.b),
+            a: self.a.max(other.a),
         }
     }
 }
@@ -61,6 +70,7 @@ impl Mul<f32> for Color {
             r: (self.r as f32 * scalar).clamp(0.0, 255.0) as u8,
             g: (self.g as f32 * scalar).clamp(0.0, 255.0) as u8,
             b: (self.b as f32 * scalar).clamp(0.0, 255.0) as u8,
+            a: self.a,
         }
     }
 }
@@ -73,12 +83,13 @@ impl Mul<Color> for Color {
             r: ((self.r as u32 * other.r as u32) / 255) as u8,
             g: ((self.g as u32 * other.g as u32) / 255) as u8,
             b: ((self.b as u32 * other.b as u32) / 255) as u8,
+            a: ((self.a as u32 * other.a as u32) / 255) as u8,
         }
     }
 }
 
 impl fmt::Display for Color {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Color(r: {}, g: {}, b: {})", self.r, self.g, self.b)
+        write!(f, "Color(r: {}, g: {}, b: {}, a: {})", self.r, self.g, self.b, self.a)
     }
 }
