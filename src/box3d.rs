@@ -1,24 +1,26 @@
 use crate::ray_intersect::{Intersect, Material, RayIntersect};
 use nalgebra_glm::Vec3;
 
+/// Representa una caja o prisma rectangular 3D (AABB orientada en los ejes) de dimensiones arbitrarias.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct Cube {
+pub struct Box3D {
     pub center: Vec3,
-    pub size: f32,
+    pub size: Vec3,
     pub min: Vec3,
     pub max: Vec3,
     pub material: Material,
 }
 
 #[allow(dead_code)]
-impl Cube {
-    pub fn new(center: Vec3, size: f32, material: Material) -> Self {
+impl Box3D {
+    /// Crea una nueva caja 3D a partir de su centro y vector de dimensiones (ancho X, alto Y, profundidad Z).
+    pub fn new(center: Vec3, size: Vec3, material: Material) -> Self {
         let half = size / 2.0;
-        let min = center - Vec3::new(half, half, half);
-        let max = center + Vec3::new(half, half, half);
+        let min = center - half;
+        let max = center + half;
 
-        Cube {
+        Box3D {
             center,
             size,
             min,
@@ -27,43 +29,65 @@ impl Cube {
         }
     }
 
-    /// Calcula las coordenadas de textura UV (u, v) en el rango [0.0, 1.0] para cualquier cara impactada del cubo.
+    /// Crea una caja 3D a partir de sus esquinas mínima y máxima.
+    pub fn from_min_max(min: Vec3, max: Vec3, material: Material) -> Self {
+        let size = max - min;
+        let center = min + size / 2.0;
+
+        Box3D {
+            center,
+            size,
+            min,
+            max,
+            material,
+        }
+    }
+
+    /// Constructor de conveniencia para cubos uniformes.
+    pub fn cube(center: Vec3, size: f32, material: Material) -> Self {
+        Self::new(center, Vec3::new(size, size, size), material)
+    }
+
+    /// Calcula las coordenadas de textura UV (u, v) en el rango [0.0, 1.0] para cualquier cara impactada de la caja rectangular.
+    ///
+    /// Proyecta el punto de impacto normalizándolo con respecto a las dimensiones reales de cada cara.
     pub fn get_uv(&self, point: &Vec3, normal: &Vec3) -> (f32, f32) {
-        let half = self.size / 2.0;
-        let d = (point - self.center) / half;
+        let min = self.min;
+        let max = self.max;
+        let size = self.size;
 
         if normal.x.abs() > 0.5 {
-            // Caras laterales (+X o -X): usamos los ejes Z e Y
+            // Caras laterales (+X o -X): mapeamos el plano Z (ancho) e Y (alto)
             let u = if normal.x > 0.0 {
-                (1.0 - d.z) / 2.0
+                (max.z - point.z) / size.z.max(1e-6)
             } else {
-                (d.z + 1.0) / 2.0
+                (point.z - min.z) / size.z.max(1e-6)
             };
-            let v = (1.0 - d.y) / 2.0;
-            (u, v)
+            let v = (max.y - point.y) / size.y.max(1e-6);
+            (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
         } else if normal.y.abs() > 0.5 {
-            // Caras superior e inferior (+Y o -Y): usamos los ejes X y Z
-            let u = (d.x + 1.0) / 2.0;
+            // Caras superior e inferior (+Y o -Y): mapeamos el plano X (ancho) y Z (profundidad)
+            let u = (point.x - min.x) / size.x.max(1e-6);
             let v = if normal.y > 0.0 {
-                (d.z + 1.0) / 2.0
+                (point.z - min.z) / size.z.max(1e-6)
             } else {
-                (1.0 - d.z) / 2.0
+                (max.z - point.z) / size.z.max(1e-6)
             };
-            (u, v)
+            (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
         } else {
-            // Caras frontal y trasera (+Z o -Z): usamos los ejes X e Y
+            // Caras frontal y trasera (+Z o -Z): mapeamos el plano X (ancho) e Y (alto)
             let u = if normal.z > 0.0 {
-                (d.x + 1.0) / 2.0
+                (point.x - min.x) / size.x.max(1e-6)
             } else {
-                (1.0 - d.x) / 2.0
+                (max.x - point.x) / size.x.max(1e-6)
             };
-            let v = (1.0 - d.y) / 2.0;
-            (u, v)
+            let v = (max.y - point.y) / size.y.max(1e-6);
+            (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
         }
     }
 }
 
-impl RayIntersect for Cube {
+impl RayIntersect for Box3D {
     fn ray_intersect(&self, ray_origin: &Vec3, ray_direction: &Vec3) -> Option<Intersect> {
         let inv_d = Vec3::new(
             1.0 / ray_direction.x,
@@ -214,28 +238,43 @@ mod tests {
     use crate::color::Color;
 
     #[test]
-    fn test_slab_front_intersection() {
+    fn test_box_slab_front_intersection() {
         let mat = crate::materials::diffuse(Color::new(255, 0, 0));
-        let cube = Cube::new(Vec3::new(0.0, 0.0, 0.0), 2.0, mat);
+        // Rectángulo con dimensiones asimétricas: ancho 4.0, alto 2.0, profundidad 1.0
+        let b = Box3D::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(4.0, 2.0, 1.0), mat);
 
         let ray_origin = Vec3::new(0.0, 0.0, 5.0);
         let ray_dir = Vec3::new(0.0, 0.0, -1.0);
 
-        let hit = cube.ray_intersect(&ray_origin, &ray_dir).unwrap();
-        assert!((hit.distance - 4.0).abs() < 1e-4);
-        assert!((hit.point.z - 1.0).abs() < 1e-4);
+        let hit = b.ray_intersect(&ray_origin, &ray_dir).unwrap();
+        assert!((hit.distance - 4.5).abs() < 1e-4);
+        assert!((hit.point.z - 0.5).abs() < 1e-4);
         assert_eq!(hit.normal, Vec3::new(0.0, 0.0, 1.0));
     }
 
     #[test]
-    fn test_slab_miss() {
+    fn test_box_miss() {
         let mat = crate::materials::diffuse(Color::new(255, 0, 0));
-        let cube = Cube::new(Vec3::new(0.0, 0.0, 0.0), 2.0, mat);
+        let b = Box3D::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(2.0, 4.0, 2.0), mat);
 
         let ray_origin = Vec3::new(5.0, 5.0, 5.0);
         let ray_dir = Vec3::new(0.0, 0.0, -1.0);
 
-        let hit = cube.ray_intersect(&ray_origin, &ray_dir);
+        let hit = b.ray_intersect(&ray_origin, &ray_dir);
         assert!(hit.is_none());
+    }
+
+    #[test]
+    fn test_box_uv_mapping() {
+        let mat = crate::materials::diffuse(Color::new(255, 0, 0));
+        // Caja: x: [-1, 1], y: [-2, 2], z: [-0.5, 0.5]
+        let b = Box3D::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(2.0, 4.0, 1.0), mat);
+
+        // Impacto en el centro de la cara frontal (+Z en z=0.5, x=0, y=0)
+        let hit_pt = Vec3::new(0.0, 0.0, 0.5);
+        let normal = Vec3::new(0.0, 0.0, 1.0);
+        let (u, v) = b.get_uv(&hit_pt, &normal);
+        assert!((u - 0.5).abs() < 1e-4);
+        assert!((v - 0.5).abs() < 1e-4);
     }
 }

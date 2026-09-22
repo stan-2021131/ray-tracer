@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
+mod box3d;
 mod camera;
 mod color;
-mod cube;
 mod framebuffer;
 mod light;
 mod materials;
@@ -59,11 +59,8 @@ fn main() {
     // ==========================================
     // 2. SELECCIÓN DE ESCENA (OBJETOS Y LUCES)
     // ==========================================
-    // Opciones disponibles en scene.rs:
-    // - scene::pyramid_with_spheres_scene()
-    // - scene::pyramid_only_scene()
-    // - scene::spheres_scene()
-    let scene = scene::spheres_scene();
+    // Opciones disponibles en scene.rs
+    let scene = scene::pyramid_only_scene();
 
     let mut camera = Camera::new(
         Vec3::new(0.0, 2.0, 6.0),

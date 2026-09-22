@@ -1,8 +1,8 @@
+use crate::box3d::Box3D;
 use crate::color::Color;
-use crate::cube::Cube;
 use crate::plane::Plane;
 use crate::sphere::Sphere;
-use crate::texture::Texture;
+use crate::texture::{Texture, TextureWrap};
 use nalgebra_glm::Vec3;
 use std::sync::Arc;
 
@@ -17,8 +17,11 @@ pub struct Material {
     pub shininess: f32,         // Exponente de brillo Phong
     pub refractive_index: f32,  // Índice de refracción (IOR)
     pub texture: Option<Arc<Texture>>,
+    pub uv_scale: (f32, f32),   // Multiplicador de repetición / escala UV (u_scale, v_scale)
+    pub wrap_mode: TextureWrap, // Modo de envoltura: Repeat (mosaico) o Clamp (estirado)
 }
 
+#[allow(dead_code)]
 impl Material {
     pub fn new(
         color: Color,
@@ -38,6 +41,8 @@ impl Material {
             shininess,
             refractive_index,
             texture: None,
+            uv_scale: (1.0, 1.0),
+            wrap_mode: TextureWrap::Repeat,
         }
     }
 
@@ -47,11 +52,25 @@ impl Material {
         self
     }
 
-    /// Retorna el color modulando el color base del material con la textura si existe.
+    /// Configura la escala de repetición UV (veces que se repite la textura a lo ancho y alto).
+    pub fn with_uv_scale(mut self, u_scale: f32, v_scale: f32) -> Self {
+        self.uv_scale = (u_scale, v_scale);
+        self
+    }
+
+    /// Configura el modo de envoltura UV (`TextureWrap::Repeat` para mosaico o `TextureWrap::Clamp` para estirado).
+    pub fn with_wrap(mut self, wrap: TextureWrap) -> Self {
+        self.wrap_mode = wrap;
+        self
+    }
+
+    /// Retorna el color modulando el color base del material con la textura escalada y envuelta si existe.
     #[inline]
     pub fn get_color(&self, u: f32, v: f32) -> Color {
         if let Some(tex) = &self.texture {
-            self.color * tex.get_color(u, v)
+            let u_scaled = u * self.uv_scale.0;
+            let v_scaled = v * self.uv_scale.1;
+            self.color * tex.get_color_nearest_wrap(u_scaled, v_scaled, self.wrap_mode)
         } else {
             self.color
         }
@@ -104,7 +123,7 @@ pub trait RayIntersect: Sync + Send {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Object {
-    Cube(Cube),
+    Box3D(Box3D),
     Sphere(Sphere),
     Plane(Plane),
 }
@@ -113,7 +132,7 @@ impl RayIntersect for Object {
     #[inline]
     fn ray_intersect(&self, ray_origin: &Vec3, ray_direction: &Vec3) -> Option<Intersect> {
         match self {
-            Object::Cube(c) => c.ray_intersect(ray_origin, ray_direction),
+            Object::Box3D(b) => b.ray_intersect(ray_origin, ray_direction),
             Object::Sphere(s) => s.ray_intersect(ray_origin, ray_direction),
             Object::Plane(p) => p.ray_intersect(ray_origin, ray_direction),
         }
@@ -122,7 +141,7 @@ impl RayIntersect for Object {
     #[inline]
     fn ray_intersect_distance(&self, ray_origin: &Vec3, ray_direction: &Vec3, max_distance: f32) -> bool {
         match self {
-            Object::Cube(c) => c.ray_intersect_distance(ray_origin, ray_direction, max_distance),
+            Object::Box3D(b) => b.ray_intersect_distance(ray_origin, ray_direction, max_distance),
             Object::Sphere(s) => s.ray_intersect_distance(ray_origin, ray_direction, max_distance),
             Object::Plane(p) => p.ray_intersect_distance(ray_origin, ray_direction, max_distance),
         }

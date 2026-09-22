@@ -176,10 +176,10 @@ impl Camera {
                         return true;
                     }
                 }
-                Object::Cube(c) => {
+                Object::Box3D(b) => {
                     // Verificación AABB expandida por el radio del jugador
-                    let min = c.min - Vec3::new(r, r, r);
-                    let max = c.max + Vec3::new(r, r, r);
+                    let min = b.min - Vec3::new(r, r, r);
+                    let max = b.max + Vec3::new(r, r, r);
                     if pos.x >= min.x && pos.x <= max.x
                         && pos.y >= min.y && pos.y <= max.y
                         && pos.z >= min.z && pos.z <= max.z
@@ -259,7 +259,7 @@ impl Camera {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cube::Cube;
+    use crate::box3d::Box3D;
     use crate::materials;
     use crate::sphere::Sphere;
 
@@ -300,14 +300,14 @@ mod tests {
     }
 
     #[test]
-    fn test_collision_cube() {
+    fn test_collision_box() {
         let camera = Camera::new(
             Vec3::new(0.0, 0.0, 0.0),
             Vec3::new(0.0, 0.0, -1.0),
             Vec3::new(0.0, 1.0, 0.0),
         );
-        let cube = Cube::new(Vec3::new(0.0, 0.0, 0.0), 2.0, materials::diffuse(crate::color::Color::new(255, 0, 0)));
-        let objects = vec![Object::Cube(cube)];
+        let b = Box3D::new(Vec3::new(0.0, 0.0, 0.0), Vec3::new(2.0, 3.0, 1.5), materials::diffuse(crate::color::Color::new(255, 0, 0)));
+        let objects = vec![Object::Box3D(b)];
 
         // Punto dentro del AABB expandido
         assert!(camera.check_collision(&Vec3::new(1.1, 0.0, 0.0), &objects));

@@ -72,53 +72,46 @@ impl Texture {
         self.buffer[py * self.width + px]
     }
 
-    /// Muestrea la textura usando coordenadas normalizadas (u, v) en el rango [0.0, 1.0].
-    /// Aplica wrapping seguro para coordenadas de cualquier forma 3D.
+    /// Muestrea la textura usando coordenadas normalizadas (u, v) en el rango [0.0, 1.0] o repetidas si u,v > 1.0.
     #[inline]
     pub fn get_color(&self, u: f32, v: f32) -> Color {
-        self.get_color_nearest(u, v)
+        self.get_color_nearest_wrap(u, v, TextureWrap::Repeat)
     }
 
-    /// Muestreo por vecino más cercano (Nearest Neighbor Sampling).
-    ///
-    /// Teoría:
-    /// Se mapea la coordenada continua (u, v) en [0, 1] al índice discreto de texel más cercano:
-    ///     x = round(u * (width - 1))
-    ///     y = round(v * (height - 1))
-    /// Este método es computacionalmente óptimo (O(1), 1 acceso a memoria) y preserva los bordes
-    /// nítidos de texturas pixel art sin generar desenfoque artificial.
+    /// Muestreo por vecino más cercano (Nearest Neighbor Sampling) con modo de envoltura UV.
     #[inline]
     pub fn get_color_nearest(&self, u: f32, v: f32) -> Color {
+        self.get_color_nearest_wrap(u, v, TextureWrap::Repeat)
+    }
+
+    /// Muestreo por vecino más cercano con envoltura UV configurable (Repeat o Clamp).
+    #[inline]
+    pub fn get_color_nearest_wrap(&self, u: f32, v: f32, wrap: TextureWrap) -> Color {
         if self.width == 0 || self.height == 0 || self.buffer.is_empty() {
             return Color::new(255, 255, 255);
         }
 
-        // Clamp estricto para evitar accesos fuera de rango
-        let u_clamped = u.clamp(0.0, 1.0);
-        let v_clamped = v.clamp(0.0, 1.0);
+        let u_wrapped = wrap_coord(u, wrap);
+        let v_wrapped = wrap_coord(v, wrap);
 
         let max_x = self.width - 1;
         let max_y = self.height - 1;
 
-        let x = ((u_clamped * max_x as f32).round() as usize).min(max_x);
-        let y = ((v_clamped * max_y as f32).round() as usize).min(max_y);
+        let x = ((u_wrapped * max_x as f32).round() as usize).min(max_x);
+        let y = ((v_wrapped * max_y as f32).round() as usize).min(max_y);
 
         self.buffer[y * self.width + x]
     }
 
-    /// Muestreo por interpolación bilineal (Bilinear Texture Filtering).
-    ///
-    /// Teoría:
-    /// Interpola suavemente entre los 4 texels vecinos (c00, c10, c01, c11) circundantes al punto continuo (gx, gy):
-    ///     gx = u * (width - 1),  gy = v * (height - 1)
-    ///     fx = frac(gx),         fy = frac(gy)
-    ///
-    /// La fórmula de interpolación bilineal para cada canal de color (R, G, B) es:
-    ///     C(u, v) = (1 - fy) * [(1 - fx) * C_00 + fx * C_10] + fy * [(1 - fx) * C_01 + fx * C_11]
-    ///
-    /// Produce transiciones suaves y continuas entre texels adyacentes en texturas fotográficas o continuas.
+    /// Muestreo por interpolación bilineal (Bilinear Texture Filtering) con modo de envoltura UV.
     #[inline]
     pub fn get_color_bilinear(&self, u: f32, v: f32) -> Color {
+        self.get_color_bilinear_wrap(u, v, TextureWrap::Repeat)
+    }
+
+    /// Muestreo bilineal con envoltura UV configurable (Repeat o Clamp).
+    #[inline]
+    pub fn get_color_bilinear_wrap(&self, u: f32, v: f32, wrap: TextureWrap) -> Color {
         if self.width == 0 || self.height == 0 || self.buffer.is_empty() {
             return Color::new(255, 255, 255);
         }
@@ -126,11 +119,11 @@ impl Texture {
         let max_x = self.width - 1;
         let max_y = self.height - 1;
 
-        let u_clamped = u.clamp(0.0, 1.0);
-        let v_clamped = v.clamp(0.0, 1.0);
+        let u_wrapped = wrap_coord(u, wrap);
+        let v_wrapped = wrap_coord(v, wrap);
 
-        let gx = u_clamped * max_x as f32;
-        let gy = v_clamped * max_y as f32;
+        let gx = u_wrapped * max_x as f32;
+        let gy = v_wrapped * max_y as f32;
 
         let x0 = (gx.floor() as usize).min(max_x);
         let x1 = (x0 + 1).min(max_x);
@@ -168,7 +161,7 @@ impl Texture {
         Color::new(r, g, b)
     }
 
-    /// Muestrea la textura utilizando el modo de filtrado indicado.
+    /// Muestrea la textura utilizando el modo de filtrado y envoltura indicados.
     #[inline]
     pub fn get_color_filtered(&self, u: f32, v: f32, filter: TextureFilter) -> Color {
         match filter {
@@ -176,6 +169,35 @@ impl Texture {
             TextureFilter::Bilinear => self.get_color_bilinear(u, v),
         }
     }
+
+    /// Muestrea la textura con filtrado y modo de envoltura explícitos.
+    #[inline]
+    pub fn get_color_wrapped(&self, u: f32, v: f32, wrap: TextureWrap, filter: TextureFilter) -> Color {
+        match filter {
+            TextureFilter::Nearest => self.get_color_nearest_wrap(u, v, wrap),
+            TextureFilter::Bilinear => self.get_color_bilinear_wrap(u, v, wrap),
+        }
+    }
+}
+
+/// Aplica la envoltura (Repeat o Clamp) a una coordenada UV continua.
+#[inline(always)]
+pub fn wrap_coord(val: f32, mode: TextureWrap) -> f32 {
+    match mode {
+        TextureWrap::Repeat => val.rem_euclid(1.0),
+        TextureWrap::Clamp => val.clamp(0.0, 1.0),
+    }
+}
+
+/// Modo de envoltura para coordenadas de textura (UV Wrapping).
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TextureWrap {
+    /// Repite la textura en mosaico continuo (por defecto para texturas de superficies).
+    #[default]
+    Repeat,
+    /// Clampa/estira los bordes de la textura entre 0.0 y 1.0.
+    Clamp,
 }
 
 /// Modo de filtrado para el muestreo de texturas y skyboxes.
@@ -192,5 +214,21 @@ pub enum TextureFilter {
 impl fmt::Debug for Texture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Texture({}x{}, {} pixels)", self.width, self.height, self.buffer.len())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wrap_repeat_and_clamp() {
+        assert_eq!(wrap_coord(0.25, TextureWrap::Repeat), 0.25);
+        assert!((wrap_coord(1.25, TextureWrap::Repeat) - 0.25).abs() < 1e-5);
+        assert!((wrap_coord(2.75, TextureWrap::Repeat) - 0.75).abs() < 1e-5);
+
+        // Clamp
+        assert_eq!(wrap_coord(1.5, TextureWrap::Clamp), 1.0);
+        assert_eq!(wrap_coord(-0.5, TextureWrap::Clamp), 0.0);
     }
 }
