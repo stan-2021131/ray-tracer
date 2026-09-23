@@ -50,6 +50,11 @@ pub fn gold(color: Color) -> Material {
     Material::new(color, 0.2, 0.4, 0.7, 0.0, 100.0, 1.0)
 }
 
+/// Material que emite luz propia brillante (ideal para bombillas, fuego o neón).
+pub fn emissive(color: Color, intensity: f32) -> Material {
+    Material::new(color, 0.1, 0.0, 0.0, 0.0, 10.0, 1.0).with_emissive(intensity)
+}
+
 /// Aplica una textura desde un archivo a cualquier material base existente.
 pub fn apply_texture(base_material: Material, texture_path: &str) -> Material {
     let texture = Arc::new(Texture::new(texture_path));

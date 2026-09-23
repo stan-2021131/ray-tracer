@@ -1,7 +1,7 @@
 use crate::camera::Camera;
 use crate::color::Color;
 use crate::framebuffer::Framebuffer;
-use crate::light::Light;
+use crate::light::{Light, LightType};
 use crate::ray_intersect::{Intersect, Object, RayIntersect};
 use crate::skybox::Skybox;
 use nalgebra_glm::{dot, normalize, Vec3};
@@ -115,7 +115,7 @@ pub fn cast_shadow(
     })
 }
 
-/// Calcula el sombreado Phong directo (difuso + brillo especular) acumulando la contribución de múltiples luces.
+/// Calcula el sombreado Phong directo (difuso + brillo especular) acumulando la contribución de múltiples luces y materiales emisivos.
 pub fn shade(
     intersect: &Intersect,
     ray_origin: &Vec3,
@@ -123,19 +123,34 @@ pub fn shade(
     objects: &[Object],
 ) -> Color {
     let view_direction = (ray_origin - intersect.point).normalize();
-    let mut total_color = Color::new(0, 0, 0);
+
+    // 1. Componente emisiva: luz propia que emana del material (independiente de sombras o fuentes de luz externas)
+    let mut total_color = if intersect.emissive > 0.0 {
+        intersect.color * intersect.emissive
+    } else {
+        Color::new(0, 0, 0)
+    };
 
     for light in lights {
-        let light_direction = (light.position - intersect.point).normalize();
+        let light_vec = light.position - intersect.point;
+        let light_distance = light_vec.magnitude();
+        let light_direction = light_vec / light_distance.max(1e-4);
 
         // Verificación de sombra para esta luz específica
         let in_shadow = cast_shadow(intersect, &light_direction, light, objects);
         let shadow_factor = if in_shadow { 0.1 } else { 1.0 };
 
+        // Factor de atenuación: Las luces puntuales decaen con la distancia; las direccionales (Sol/Luna) permanecen constantes
+        let attenuation = match light.light_type {
+            LightType::Directional => 1.0,
+            LightType::Point => 1.0 / (1.0 + 0.15 * light_distance + 0.05 * light_distance * light_distance),
+        };
+        let effective_intensity = light.intensity * attenuation * shadow_factor;
+
         // Componente difusa (Lambertiana)
         let diffuse_intensity = dot(&intersect.normal, &light_direction).max(0.0);
         let diffuse = intersect.color
-            * (diffuse_intensity * intersect.diffuse * light.intensity * shadow_factor);
+            * (diffuse_intensity * intersect.diffuse * effective_intensity);
 
         // Componente especular (Phong)
         let specular = if in_shadow {
@@ -145,7 +160,7 @@ pub fn shade(
             let specular_intensity = dot(&view_direction, &reflect_direction)
                 .max(0.0)
                 .powf(intersect.shininess);
-            light.color * (specular_intensity * intersect.specular * light.intensity)
+            light.color * (specular_intensity * intersect.specular * effective_intensity)
         };
 
         total_color = total_color + diffuse + specular;

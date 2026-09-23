@@ -14,6 +14,7 @@ pub struct Material {
     pub specular: f32,          // Peso de brillo especular directo (Phong)
     pub reflective: f32,        // Peso de reflexión especular indirecta (Espejo)
     pub refractive: f32,        // Peso de refracción / transmisión (Transparencia)
+    pub emissive: f32,          // Emisión de luz propia (0.0 = normal, >0.0 = fuente de brillo)
     pub shininess: f32,         // Exponente de brillo Phong
     pub refractive_index: f32,  // Índice de refracción (IOR)
     pub texture: Option<Arc<Texture>>,
@@ -38,6 +39,7 @@ impl Material {
             specular,
             reflective,
             refractive,
+            emissive: 0.0,
             shininess,
             refractive_index,
             texture: None,
@@ -49,6 +51,12 @@ impl Material {
     /// Asigna una textura a este material retornando el material modificado (patrón Builder).
     pub fn with_texture(mut self, texture: Arc<Texture>) -> Self {
         self.texture = Some(texture);
+        self
+    }
+
+    /// Configura la emisión de luz propia del material.
+    pub fn with_emissive(mut self, emissive: f32) -> Self {
+        self.emissive = emissive;
         self
     }
 
@@ -100,6 +108,7 @@ impl Material {
             specular: self.specular,
             reflective: self.reflective,
             refractive: self.refractive,
+            emissive: self.emissive,
             shininess: self.shininess,
             refractive_index: self.refractive_index,
         }
@@ -117,6 +126,7 @@ pub struct Intersect {
     pub specular: f32,
     pub reflective: f32,
     pub refractive: f32,
+    pub emissive: f32,
     pub shininess: f32,
     pub refractive_index: f32,
 }

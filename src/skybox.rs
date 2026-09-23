@@ -35,6 +35,7 @@ pub struct Skybox {
     pub back: Texture,
     pub filter: TextureFilter,
     pub rotation_y: f32,
+    pub has_rotation: bool,
 }
 
 impl Skybox {
@@ -59,6 +60,7 @@ impl Skybox {
             back: Texture::new(back_path),
             filter: TextureFilter::Nearest,
             rotation_y: 0.0,
+            has_rotation: false,
         }
     }
 
@@ -72,6 +74,7 @@ impl Skybox {
     #[allow(dead_code)]
     pub fn with_rotation_y(mut self, radians: f32) -> Self {
         self.rotation_y = radians;
+        self.has_rotation = radians.abs() > 1e-6;
         self
     }
 
@@ -80,6 +83,7 @@ impl Skybox {
     #[inline]
     pub fn set_rotation_y(&mut self, radians: f32) -> Self {
         self.rotation_y = radians;
+        self.has_rotation = radians.abs() > 1e-6;
         self.clone()
     }
 
@@ -184,8 +188,8 @@ impl Skybox {
     /// - Usa el modo de filtrado seleccionado (Nearest para pixel art o Bilinear para suavizado).
     #[inline]
     pub fn sample(&self, ray_direction: &Vec3) -> Color {
-        // Aplicar rotación sobre el eje Y si es distinta de cero
-        let dir = if self.rotation_y.abs() > 1e-6 {
+        // Aplicar rotación sobre el eje Y solo si está configurada
+        let dir = if self.has_rotation {
             let cos_theta = self.rotation_y.cos();
             let sin_theta = self.rotation_y.sin();
             // Matriz de rotación estándar alrededor del eje Y:
