@@ -62,6 +62,44 @@ pub fn fresnel(incident: &Vec3, normal: &Vec3, ior: f32) -> f32 {
     r0 + (1.0 - r0) * (1.0 - cosi).powi(5)
 }
 
+/// Comprueba si un rayo intersecta una caja alineada a los ejes (AABB).
+#[allow(dead_code)]
+#[inline]
+pub fn intersect_aabb(ray_origin: &Vec3, ray_direction: &Vec3, min: &Vec3, max: &Vec3) -> bool {
+    let inv_x = 1.0 / ray_direction.x;
+    let (t0x, t1x) = if ray_direction.x >= 0.0 {
+        ((min.x - ray_origin.x) * inv_x, (max.x - ray_origin.x) * inv_x)
+    } else {
+        ((max.x - ray_origin.x) * inv_x, (min.x - ray_origin.x) * inv_x)
+    };
+
+    let inv_y = 1.0 / ray_direction.y;
+    let (t0y, t1y) = if ray_direction.y >= 0.0 {
+        ((min.y - ray_origin.y) * inv_y, (max.y - ray_origin.y) * inv_y)
+    } else {
+        ((max.y - ray_origin.y) * inv_y, (min.y - ray_origin.y) * inv_y)
+    };
+
+    let tmin = t0x.max(t0y);
+    let tmax = t1x.min(t1y);
+
+    if tmin > tmax {
+        return false;
+    }
+
+    let inv_z = 1.0 / ray_direction.z;
+    let (t0z, t1z) = if ray_direction.z >= 0.0 {
+        ((min.z - ray_origin.z) * inv_z, (max.z - ray_origin.z) * inv_z)
+    } else {
+        ((max.z - ray_origin.z) * inv_z, (min.z - ray_origin.z) * inv_z)
+    };
+
+    let tmin = tmin.max(t0z);
+    let tmax = tmax.min(t1z);
+
+    tmax >= tmin.max(0.0)
+}
+
 /// Comprueba si el punto de intersección está bloqueado respecto a la fuente de luz por otro objeto.
 pub fn cast_shadow(
     intersect: &Intersect,
@@ -150,8 +188,12 @@ pub fn cast_ray(
             .unwrap_or_else(|| Color::from_hex(BACKGROUND_COLOR));
     };
 
-    // 1. Iluminación directa acumulada de todas las luces
-    let direct_color = shade(&intersect, ray_origin, lights, objects);
+    // 1. Iluminación directa acumulada de todas las luces (solo si tiene componentes directas difusa o especular)
+    let direct_color = if intersect.diffuse > 0.0 || intersect.specular > 0.0 {
+        shade(&intersect, ray_origin, lights, objects)
+    } else {
+        Color::new(0, 0, 0)
+    };
 
     // Retorno rápido si el material no es reflectivo ni transparente
     if intersect.reflective <= 0.0 && intersect.refractive <= 0.0 {
@@ -159,15 +201,40 @@ pub fn cast_ray(
     }
 
     // 2. Coeficiente de Fresnel para materiales transparentes/reflectivos
-    let kr = if intersect.refractive > 0.0 {
+    let mut kr = if intersect.refractive > 0.0 {
         fresnel(ray_direction, &intersect.normal, intersect.refractive_index)
     } else {
         1.0
     };
 
-    // 3. Rayo de Reflexión
+    // 3. Rayo de Refracción (evaluado primero para comprobar si ocurre Reflexión Interna Total)
+    let mut refraction_color = Color::new(0, 0, 0);
+    let mut has_refraction = false;
+    if intersect.refractive > 0.0 {
+        if let Some(refract_dir) = refract(ray_direction, &intersect.normal, intersect.refractive_index) {
+            let refract_orig = if dot(ray_direction, &intersect.normal) < 0.0 {
+                intersect.point - intersect.normal * REFRACTION_BIAS
+            } else {
+                intersect.point + intersect.normal * REFRACTION_BIAS
+            };
+            refraction_color = cast_ray(
+                &refract_orig,
+                &refract_dir,
+                objects,
+                lights,
+                skybox,
+                depth + 1,
+            );
+            has_refraction = true;
+        } else {
+            // En Reflexión Interna Total (TIR), el 100% de la energía refractada se refleja
+            kr = 1.0;
+        }
+    }
+
+    // 4. Rayo de Reflexión (ponderado con kr actualizado por TIR)
     let mut reflection_color = Color::new(0, 0, 0);
-    let reflect_weight = intersect.reflective + intersect.refractive * kr;
+    let reflect_weight = intersect.reflective + if intersect.refractive > 0.0 { intersect.refractive * kr } else { 0.0 };
     if reflect_weight > 0.0 {
         let reflect_dir = reflect(ray_direction, &intersect.normal);
         let reflect_orig = if dot(ray_direction, &intersect.normal) < 0.0 {
@@ -185,32 +252,8 @@ pub fn cast_ray(
         );
     }
 
-    // 4. Rayo de Refracción
-    let mut refraction_color = Color::new(0, 0, 0);
-    let refract_weight = intersect.refractive * (1.0 - kr);
-    if refract_weight > 0.0 {
-        if let Some(refract_dir) = refract(ray_direction, &intersect.normal, intersect.refractive_index) {
-            let refract_orig = if dot(ray_direction, &intersect.normal) < 0.0 {
-                intersect.point - intersect.normal * REFRACTION_BIAS
-            } else {
-                intersect.point + intersect.normal * REFRACTION_BIAS
-            };
-            refraction_color = cast_ray(
-                &refract_orig,
-                &refract_dir,
-                objects,
-                lights,
-                skybox,
-                depth + 1,
-            );
-        } else {
-            // En Reflexión Interna Total (TIR), la energía refractada se refleja completamente
-            refraction_color = reflection_color;
-        }
-    }
-
-    // Combinación ponderada de iluminación directa, reflexión y refracción
-    let reflect_contrib = reflection_color * (intersect.reflective * kr + if intersect.refractive > 0.0 { intersect.refractive * kr } else { 0.0 });
+    let refract_weight = if has_refraction { intersect.refractive * (1.0 - kr) } else { 0.0 };
+    let reflect_contrib = reflection_color * reflect_weight;
     let refract_contrib = refraction_color * refract_weight;
 
     direct_color + reflect_contrib + refract_contrib
@@ -315,5 +358,21 @@ mod tests {
         let incident_grazing = Vec3::new(0.999, -0.001, 0.0).normalize();
         let kr_grazing = fresnel(&incident_grazing, &normal, 1.5);
         assert!(kr_grazing > 0.95);
+    }
+
+    #[test]
+    fn test_intersect_aabb() {
+        let min = Vec3::new(-1.0, -1.0, -1.0);
+        let max = Vec3::new(1.0, 1.0, 1.0);
+
+        // Rayo que impacta de frente
+        let ray_orig = Vec3::new(0.0, 0.0, 5.0);
+        let ray_dir = Vec3::new(0.0, 0.0, -1.0);
+        assert!(intersect_aabb(&ray_orig, &ray_dir, &min, &max));
+
+        // Rayo que pasa de largo
+        let miss_orig = Vec3::new(5.0, 5.0, 5.0);
+        let miss_dir = Vec3::new(0.0, 0.0, -1.0);
+        assert!(!intersect_aabb(&miss_orig, &miss_dir, &min, &max));
     }
 }

@@ -280,7 +280,7 @@ impl RayIntersect for Box3D {
 
         // Soporte de transparencia Alpha Cutout: si el píxel de la textura es transparente, el rayo continúa
         let color = self.material.get_color(u, v);
-        if color.a < 128 {
+        if self.material.has_alpha() && color.a < 128 {
             return None;
         }
 
@@ -354,7 +354,8 @@ impl RayIntersect for Box3D {
             return false;
         }
 
-        if self.material.texture.is_some() {
+        // Solo calcular normales y muestreo de textura si el material realmente contiene transparencia
+        if self.material.has_alpha() {
             let local_point = local_origin + local_dir * t;
             let local_normal = if (local_point.x - half.x).abs() < 1e-3 {
                 Vec3::new(1.0, 0.0, 0.0)

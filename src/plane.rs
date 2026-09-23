@@ -98,7 +98,7 @@ impl RayIntersect for Plane {
 
         // Soporte de transparencia Alpha Cutout: si el píxel de la textura es transparente, el rayo continúa
         let color = self.material.get_color(u_coord, v_coord);
-        if color.a < 128 {
+        if self.material.has_alpha() && color.a < 128 {
             return None;
         }
 
@@ -130,7 +130,7 @@ impl RayIntersect for Plane {
         }
 
         // Si la textura tiene zonas transparentes, la sombra tampoco se proyecta
-        if self.material.texture.is_some() {
+        if self.material.has_alpha() {
             let u_coord = (u_proj / self.width) + 0.5;
             let v_coord = (v_proj / self.height) + 0.5;
             if self.material.get_color(u_coord, v_coord).a < 128 {
@@ -159,7 +159,7 @@ mod tests {
             Color::new_rgba(255, 0, 0, 255),
             Color::new_rgba(255, 0, 0, 255),
         ];
-        let tex = Arc::new(Texture { width: 2, height: 2, buffer });
+        let tex = Arc::new(Texture { width: 2, height: 2, buffer, has_alpha: true });
         let mat = materials::diffuse(Color::new(255, 255, 255)).with_texture(tex);
 
         let plane = Plane::new_with_normal(

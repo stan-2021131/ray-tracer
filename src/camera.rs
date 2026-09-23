@@ -138,21 +138,17 @@ impl Camera {
 
     /// Rotación orbital alrededor del objetivo (modo Orbit).
     pub fn orbit(&mut self, delta_yaw: f32, delta_pitch: f32) {
-        let radius_vector = self.eye - self.center;
-        let radius = radius_vector.magnitude();
+        let radius = (self.eye - self.center).magnitude();
 
-        let current_yaw = radius_vector.z.atan2(radius_vector.x);
-        let radius_xz = (radius_vector.x * radius_vector.x + radius_vector.z * radius_vector.z).sqrt();
-        let current_pitch = (-radius_vector.y).atan2(radius_xz);
+        self.yaw = (self.yaw + delta_yaw) % (2.0 * PI);
+        self.pitch = (self.pitch + delta_pitch).clamp(-PITCH_LIMIT, PITCH_LIMIT);
 
-        let new_yaw = (current_yaw + delta_yaw) % (2.0 * PI);
-        let new_pitch = (current_pitch + delta_pitch).clamp(-PITCH_LIMIT, PITCH_LIMIT);
-
+        let cos_pitch = self.pitch.cos();
         self.eye = self.center
             + Vec3::new(
-                radius * new_yaw.cos() * new_pitch.cos(),
-                -radius * new_pitch.sin(),
-                radius * new_yaw.sin() * new_pitch.cos(),
+                -radius * self.yaw.sin() * cos_pitch,
+                -radius * self.pitch.sin(),
+                radius * self.yaw.cos() * cos_pitch,
             );
         self.update_basis();
     }
@@ -317,5 +313,28 @@ mod tests {
 
         // Punto fuera del AABB
         assert!(!camera.check_collision(&Vec3::new(3.0, 0.0, 0.0), &objects));
+    }
+
+    #[test]
+    fn test_orbit_continuity() {
+        let eye_init = Vec3::new(0.0, 15.0, 18.0);
+        let center_init = Vec3::new(0.0, 0.0, 0.0);
+        let mut camera = Camera::new(
+            eye_init,
+            center_init,
+            Vec3::new(0.0, 1.0, 0.0),
+        );
+
+        // Sin movimiento delta, la posición calculada debe ser idéntica a eye inicial
+        camera.orbit(0.0, 0.0);
+        assert!((camera.eye.x - eye_init.x).abs() < 1e-4);
+        assert!((camera.eye.y - eye_init.y).abs() < 1e-4);
+        assert!((camera.eye.z - eye_init.z).abs() < 1e-4);
+
+        // Con un movimiento delta pequeño, la cámara debe desplazarse suavemente sin saltar a otro cuadrante
+        camera.orbit(0.01, 0.0);
+        assert!((camera.eye.x - (-0.234)).abs() < 0.1);
+        assert!((camera.eye.y - 15.0).abs() < 0.1);
+        assert!((camera.eye.z - 18.0).abs() < 0.1);
     }
 }

@@ -6,6 +6,7 @@ pub struct Texture {
     pub width: usize,
     pub height: usize,
     pub buffer: Vec<Color>,
+    pub has_alpha: bool,
 }
 
 impl Texture {
@@ -16,10 +17,14 @@ impl Texture {
             Ok(img) => {
                 let rgba = img.to_rgba8();
                 let (width, height) = rgba.dimensions();
+                let mut has_alpha = false;
                 let buffer = rgba
                     .pixels()
                     .map(|p| {
                         let [r, g, b, a] = p.0;
+                        if a < 255 {
+                            has_alpha = true;
+                        }
                         Color::new_rgba(r, g, b, a)
                     })
                     .collect();
@@ -27,6 +32,7 @@ impl Texture {
                     width: width as usize,
                     height: height as usize,
                     buffer,
+                    has_alpha,
                 }
             }
             Err(err) => {
@@ -57,6 +63,7 @@ impl Texture {
             width,
             height,
             buffer,
+            has_alpha: false,
         }
     }
 

@@ -76,6 +76,12 @@ impl Material {
         }
     }
 
+    /// Indica si el material posee una textura con canal alfa/transparencia activo.
+    #[inline]
+    pub fn has_alpha(&self) -> bool {
+        self.texture.as_ref().map(|t| t.has_alpha).unwrap_or(false)
+    }
+
     /// Convierte los datos del material en una estructura `Intersect` para el impacto de un rayo.
     #[inline]
     pub fn to_intersect(&self, point: Vec3, normal: Vec3, distance: f32, u: f32, v: f32) -> Intersect {
@@ -132,6 +138,26 @@ pub enum Object {
     Box3D(Box3D),
     Sphere(Sphere),
     Plane(Plane),
+}
+
+impl Object {
+    /// Retorna la caja envolvente alineada a los ejes (AABB: min, max) del objeto en espacio de mundo.
+    pub fn aabb(&self) -> (Vec3, Vec3) {
+        match self {
+            Object::Box3D(b) => (b.min, b.max),
+            Object::Sphere(s) => {
+                let r = Vec3::new(s.radius, s.radius, s.radius);
+                (s.center - r, s.center + r)
+            }
+            Object::Plane(p) => {
+                let ext_x = p.u.x.abs() * p.half_w + p.v.x.abs() * p.half_h + 0.05;
+                let ext_y = p.u.y.abs() * p.half_w + p.v.y.abs() * p.half_h + 0.05;
+                let ext_z = p.u.z.abs() * p.half_w + p.v.z.abs() * p.half_h + 0.05;
+                let extent = Vec3::new(ext_x, ext_y, ext_z);
+                (p.center - extent, p.center + extent)
+            }
+        }
+    }
 }
 
 impl RayIntersect for Object {
