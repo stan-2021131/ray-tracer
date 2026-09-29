@@ -46,7 +46,7 @@ impl Camera {
             pitch: current_pitch,
             mode: CameraMode::Orbit,
             collision_radius: 0.35,
-            eye_height: 0.7,
+            eye_height: 1.5,
             forward: Vec3::zeros(),
             right: Vec3::zeros(),
             cam_up: Vec3::zeros(),
@@ -64,8 +64,8 @@ impl Camera {
                 self.yaw = dir.x.atan2(-dir.z);
                 let radius_xz = (dir.x * dir.x + dir.z * dir.z).sqrt();
                 self.pitch = dir.y.atan2(radius_xz).clamp(-PITCH_LIMIT, PITCH_LIMIT);
-                // Colocar la cámara a la altura de un personaje (1.0 unidad)
-                self.eye.y = self.eye_height;
+                // Colocar la cámara a la altura de los ojos de un personaje sobre el suelo (suelo a Y = 1.0)
+                self.eye.y = 1.0 + self.eye_height;
                 CameraMode::FpsCollision
             }
             CameraMode::FpsCollision => CameraMode::FreeCam,
