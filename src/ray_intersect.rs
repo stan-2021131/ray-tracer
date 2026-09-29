@@ -18,6 +18,8 @@ pub struct Material {
     pub shininess: f32,         // Exponente de brillo Phong
     pub refractive_index: f32,  // Índice de refracción (IOR)
     pub texture: Option<Arc<Texture>>,
+    pub animated_frames: Option<Arc<Vec<Arc<Texture>>>>,
+    pub animation_fps: f32,
     pub uv_scale: (f32, f32),   // Multiplicador de repetición / escala UV (u_scale, v_scale)
     pub wrap_mode: TextureWrap, // Modo de envoltura: Repeat (mosaico) o Clamp (estirado)
 }
@@ -43,6 +45,8 @@ impl Material {
             shininess,
             refractive_index,
             texture: None,
+            animated_frames: None,
+            animation_fps: 1.0,
             uv_scale: (1.0, 1.0),
             wrap_mode: TextureWrap::Repeat,
         }
@@ -52,6 +56,27 @@ impl Material {
     pub fn with_texture(mut self, texture: Arc<Texture>) -> Self {
         self.texture = Some(texture);
         self
+    }
+
+    /// Configura una secuencia de texturas animadas (ciclo de cuadros) con una velocidad dada en FPS.
+    pub fn with_animated_textures(mut self, frames: Vec<Arc<Texture>>, fps: f32) -> Self {
+        if let Some(first) = frames.first() {
+            self.texture = Some(Arc::clone(first));
+        }
+        self.animated_frames = Some(Arc::new(frames));
+        self.animation_fps = fps.max(0.001);
+        self
+    }
+
+    /// Actualiza la textura activa según el tiempo transcurrido (en segundos).
+    #[inline]
+    pub fn update_time(&mut self, time: f32) {
+        if let Some(frames) = &self.animated_frames {
+            if !frames.is_empty() {
+                let idx = ((time * self.animation_fps).floor() as usize) % frames.len();
+                self.texture = Some(Arc::clone(&frames[idx]));
+            }
+        }
     }
 
     /// Configura la emisión de luz propia del material.
@@ -166,6 +191,24 @@ impl Object {
                 let extent = Vec3::new(ext_x, ext_y, ext_z);
                 (p.center - extent, p.center + extent)
             }
+        }
+    }
+
+    /// Actualiza el estado de animación del material en base al tiempo actual transcurrido.
+    pub fn update_time(&mut self, time: f32) {
+        match self {
+            Object::Box3D(b) => b.material.update_time(time),
+            Object::Sphere(s) => s.material.update_time(time),
+            Object::Plane(p) => p.material.update_time(time),
+        }
+    }
+
+    /// Retorna verdadero si el objeto posee un ciclo de texturas animadas.
+    pub fn is_animated(&self) -> bool {
+        match self {
+            Object::Box3D(b) => b.material.animated_frames.is_some(),
+            Object::Sphere(s) => s.material.animated_frames.is_some(),
+            Object::Plane(p) => p.material.animated_frames.is_some(),
         }
     }
 }

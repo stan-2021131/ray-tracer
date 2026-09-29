@@ -60,3 +60,16 @@ pub fn apply_texture(base_material: Material, texture_path: &str) -> Material {
     let texture = Arc::new(Texture::new(texture_path));
     base_material.with_texture(texture)
 }
+
+/// Aplica una secuencia de texturas animadas (ciclo de cuadros) a cualquier material base dado su framerate (FPS).
+pub fn apply_animated_texture(
+    base_material: Material,
+    texture_paths: &[&str],
+    fps: f32,
+) -> Material {
+    let frames: Vec<Arc<Texture>> = texture_paths
+        .iter()
+        .map(|path| Arc::new(Texture::new(path)))
+        .collect();
+    base_material.with_animated_textures(frames, fps)
+}
