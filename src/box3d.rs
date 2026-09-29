@@ -125,38 +125,37 @@ impl Box3D {
         self.max = max;
     }
 
-    /// Calcula las coordenadas de textura UV (u, v) en el rango [0.0, 1.0] para cualquier cara impactada en espacio local.
+    /// Calcula las coordenadas de textura UV (u, v) en unidades de bloque métrico (1.0 = 1 baldosa de textura).
     pub fn get_uv_local(&self, local_point: &Vec3, local_normal: &Vec3) -> (f32, f32) {
         let half = self.half_size;
-        let size = self.size;
 
         if local_normal.x.abs() > 0.5 {
-            // Caras laterales (+X o -X): mapeamos el plano Z (ancho) e Y (alto)
+            // Caras laterales (+X o -X): plano Z (ancho) e Y (alto)
             let u = if local_normal.x > 0.0 {
-                (half.z - local_point.z) / size.z.max(1e-6)
+                half.z - local_point.z
             } else {
-                (local_point.z + half.z) / size.z.max(1e-6)
+                local_point.z + half.z
             };
-            let v = (half.y - local_point.y) / size.y.max(1e-6);
-            (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
+            let v = half.y - local_point.y;
+            (u, v)
         } else if local_normal.y.abs() > 0.5 {
-            // Caras superior e inferior (+Y o -Y): mapeamos el plano X (ancho) y Z (profundidad)
-            let u = (local_point.x + half.x) / size.x.max(1e-6);
+            // Caras superior e inferior (+Y o -Y): plano X (ancho) y Z (profundidad)
+            let u = local_point.x + half.x;
             let v = if local_normal.y > 0.0 {
-                (local_point.z + half.z) / size.z.max(1e-6)
+                local_point.z + half.z
             } else {
-                (half.z - local_point.z) / size.z.max(1e-6)
+                half.z - local_point.z
             };
-            (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
+            (u, v)
         } else {
-            // Caras frontal y trasera (+Z o -Z): mapeamos el plano X (ancho) e Y (alto)
+            // Caras frontal y trasera (+Z o -Z): plano X (ancho) e Y (alto)
             let u = if local_normal.z > 0.0 {
-                (local_point.x + half.x) / size.x.max(1e-6)
+                local_point.x + half.x
             } else {
-                (half.x - local_point.x) / size.x.max(1e-6)
+                half.x - local_point.x
             };
-            let v = (half.y - local_point.y) / size.y.max(1e-6);
-            (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
+            let v = half.y - local_point.y;
+            (u, v)
         }
     }
 }
@@ -301,6 +300,11 @@ impl RayIntersect for Box3D {
     }
 
     fn ray_intersect_distance(&self, ray_origin: &Vec3, ray_direction: &Vec3, max_distance: f32) -> bool {
+        // Materiales transparentes / refractivos (vidrio, agua) no bloquean sombras opacas
+        if self.material.refractive > 0.5 {
+            return false;
+        }
+
         let (local_origin, local_dir) = if self.is_rotated {
             (
                 self.inv_rot_mat * (ray_origin - self.center),
@@ -428,7 +432,7 @@ mod tests {
         let hit_pt = Vec3::new(0.0, 0.0, 0.5);
         let normal = Vec3::new(0.0, 0.0, 1.0);
         let (u, v) = b.get_uv_local(&hit_pt, &normal);
-        assert!((u - 0.5).abs() < 1e-4);
-        assert!((v - 0.5).abs() < 1e-4);
+        assert!((u - 1.0).abs() < 1e-4);
+        assert!((v - 2.0).abs() < 1e-4);
     }
 }
