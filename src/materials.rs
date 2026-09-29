@@ -35,6 +35,11 @@ pub fn mirror(tint: Color) -> Material {
     Material::new(tint, 0.1, 0.1, 0.85, 0.0, 125.0, 1.0)
 }
 
+/// Material reflectante opaco para ventanas (brillo especular y reflejo moderado sin transparencia).
+pub fn reflective_window(tint: Color) -> Material {
+    Material::new(tint, 0.4, 0.4, 0.20, 0.0, 60.0, 1.0)
+}
+
 /// Vidrio dieléctrico transparente con índice de refracción IOR = 1.52 y tinte configurable.
 pub fn glass(tint: Color) -> Material {
     Material::new(tint, 0.0, 0.1, 0.05, 0.95, 125.0, 1.52)
