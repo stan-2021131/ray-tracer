@@ -94,7 +94,7 @@ impl RayIntersect for Plane {
         };
 
         let u_coord = (u_proj / self.width) + 0.5;
-        let v_coord = (v_proj / self.height) + 0.5;
+        let v_coord = 0.5 - (v_proj / self.height);
 
         // Soporte de transparencia Alpha Cutout: si el píxel de la textura es transparente, el rayo continúa
         let color = self.material.get_color(u_coord, v_coord);
@@ -106,6 +106,11 @@ impl RayIntersect for Plane {
     }
 
     fn ray_intersect_distance(&self, ray_origin: &Vec3, ray_direction: &Vec3, max_distance: f32) -> bool {
+        // Materiales transparentes / refractivos (vidrio, ventanas) no bloquean sombras opacas
+        if self.material.refractive > 0.5 {
+            return false;
+        }
+
         let denom = dot(&self.normal, ray_direction);
 
         if denom.abs() < 1e-6 {
@@ -132,7 +137,7 @@ impl RayIntersect for Plane {
         // Si la textura tiene zonas transparentes, la sombra tampoco se proyecta
         if self.material.has_alpha() {
             let u_coord = (u_proj / self.width) + 0.5;
-            let v_coord = (v_proj / self.height) + 0.5;
+            let v_coord = 0.5 - (v_proj / self.height);
             if self.material.get_color(u_coord, v_coord).a < 128 {
                 return false;
             }
@@ -152,9 +157,9 @@ mod tests {
 
     #[test]
     fn test_plane_intersection_and_alpha_cutout() {
-        // Textura 2x2: píxel (0,0) transparente (alfa = 0), píxel (1,1) opaco rojo (alfa = 255)
+        // Textura 2x2: píxel (0,0) [superior izquierdo] transparente (alfa = 0), demás opacos rojos (alfa = 255)
         let buffer = vec![
-            Color::new_rgba(0, 0, 0, 0),       // u < 0.5, v < 0.5 -> transparente
+            Color::new_rgba(0, 0, 0, 0),       // u < 0.5, v < 0.5 (arriba-izquierda) -> transparente
             Color::new_rgba(255, 0, 0, 255),
             Color::new_rgba(255, 0, 0, 255),
             Color::new_rgba(255, 0, 0, 255),
@@ -170,13 +175,13 @@ mod tests {
             mat,
         );
 
-        // Rayo hacia zona transparente (esquina inferior izquierda: x = -0.5, y = -0.5)
-        let ray_origin_transparent = Vec3::new(-0.5, -0.5, 5.0);
+        // Rayo hacia zona transparente (esquina superior izquierda: x = -0.5, y = 0.5)
+        let ray_origin_transparent = Vec3::new(-0.5, 0.5, 5.0);
         let ray_dir = Vec3::new(0.0, 0.0, -1.0);
         assert!(plane.ray_intersect(&ray_origin_transparent, &ray_dir).is_none());
 
-        // Rayo hacia zona opaca (esquina superior derecha: x = 0.5, y = 0.5)
-        let ray_origin_opaque = Vec3::new(0.5, 0.5, 5.0);
+        // Rayo hacia zona opaca (esquina inferior derecha: x = 0.5, y = -0.5)
+        let ray_origin_opaque = Vec3::new(0.5, -0.5, 5.0);
         let hit = plane.ray_intersect(&ray_origin_opaque, &ray_dir);
         assert!(hit.is_some());
         assert_eq!(hit.unwrap().color.r, 255);
