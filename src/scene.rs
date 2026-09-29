@@ -58,6 +58,11 @@ impl Scene {
     }
 }
 
+/// Escena diorama exterior completa (blockout con estanque, muelle, fogata, telescopio, silla, caminos, lámparas, árboles y cerca).
+pub fn diorama_scene() -> Scene {
+    crate::diorama_builder::build_diorama_scene()
+}
+
 
 /// Escena completa: Pirámide escalonada de losas rectangulares texturizadas, suelo de jade y dos esferas (espejo y vidrio).
 pub fn pyramid_with_spheres_scene() -> Scene {
