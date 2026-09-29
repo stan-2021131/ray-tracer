@@ -2,6 +2,7 @@
 mod box3d;
 mod camera;
 mod color;
+mod diorama_builder;
 mod framebuffer;
 mod light;
 mod materials;
@@ -12,6 +13,7 @@ mod scene;
 mod skybox;
 mod sphere;
 mod texture;
+mod texture_manager;
 
 use minifb::{Key, Scale, Window, WindowOptions};
 use nalgebra_glm::Vec3;
@@ -26,8 +28,8 @@ use crate::renderer::render;
 use crate::skybox::Skybox;
 use crate::texture::TextureFilter;
 
-const WIDTH: usize = 975;
-const HEIGHT: usize = 675;
+const WIDTH: usize = 400;
+const HEIGHT: usize = 250;
 const ROTATION_SPEED: f32 = PI / 45.0;
 const MOVE_SPEED: f32 = 0.2;
 
@@ -39,7 +41,10 @@ fn main() {
         "Ray Tracer - [Modo: Orbit] (Tab/C cambia modo, R reinicia)",
         WIDTH,
         HEIGHT,
-        WindowOptions { ..WindowOptions::default() },
+        WindowOptions {
+            scale: Scale::X2,
+            ..WindowOptions::default()
+        },
     )
     .unwrap();
 
@@ -59,15 +64,16 @@ fn main() {
     // ==========================================
     // 2. SELECCIÓN DE ESCENA (OBJETOS Y LUCES)
     // ==========================================
-    // Opciones disponibles en scene.rs
-    let scene = scene::pyramid_only_scene();
+    // Escena Diorama exterior (o pyramid_only_scene / rectangular_structures_scene / spheres_scene)
+    let mut scene = scene::diorama_scene();
 
     let mut camera = Camera::new(
-        Vec3::new(0.0, 2.0, 6.0),
-        Vec3::new(0.0, 0.0, 0.0),
+        Vec3::new(0.0, 20.0, 24.0),
+        Vec3::new(0.0, 2.0, -3.0),
         Vec3::new(0.0, 1.0, 0.0),
     );
 
+    let start_time = std::time::Instant::now();
     let mut camera_moved = true;
     let mut tab_was_down = false;
     let mut c_was_down = false;
@@ -79,8 +85,8 @@ fn main() {
         // --- Reinicio de Cámara (R) ---
         if window.is_key_down(Key::R) {
             camera.reset(
-                Vec3::new(0.0, 2.0, 6.0),
-                Vec3::new(0.0, 0.0, 0.0),
+                Vec3::new(0.0, 20.0, 24.0),
+                Vec3::new(0.0, 2.0, -3.0),
                 Vec3::new(0.0, 1.0, 0.0),
             );
             window.set_title("Ray Tracer - [Modo: Orbit (Flechas para orbitar)] (Tab/C cambia, R reinicia)");
@@ -148,8 +154,14 @@ fn main() {
             camera_moved = true;
         }
 
-        // --- Renderizado reactivo solo al mover la cámara ---
-        if camera_moved {
+        // --- Actualización de animaciones y renderizado reactivo ---
+        let elapsed = start_time.elapsed().as_secs_f32();
+        let has_animations = scene.has_animations();
+        if has_animations {
+            scene.update_time(elapsed);
+        }
+
+        if camera_moved || has_animations {
             render(
                 &mut framebuffer,
                 &scene.objects,
