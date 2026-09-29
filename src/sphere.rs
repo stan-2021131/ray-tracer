@@ -56,6 +56,11 @@ impl RayIntersect for Sphere {
     }
 
     fn ray_intersect_distance(&self, ray_origin: &Vec3, ray_direction: &Vec3, max_distance: f32) -> bool {
+        // Materiales transparentes / refractivos (vidrio, bombillas) no bloquean sombras opacas
+        if self.material.refractive > 0.5 {
+            return false;
+        }
+
         let oc = ray_origin - self.center;
         let b = dot(&oc, ray_direction);
         let c = dot(&oc, &oc) - self.radius * self.radius;
