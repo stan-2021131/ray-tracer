@@ -14,13 +14,50 @@ use nalgebra_glm::Vec3;
 pub struct Scene {
     pub objects: Vec<Object>,
     pub lights: Vec<Light>,
+    pub bounds: (Vec3, Vec3),
 }
 
 impl Scene {
     pub fn new(objects: Vec<Object>, lights: Vec<Light>) -> Self {
-        Scene { objects, lights }
+        let mut min_bound = Vec3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY);
+        let mut max_bound = Vec3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
+
+        for obj in &objects {
+            let (obj_min, obj_max) = obj.aabb();
+            min_bound.x = min_bound.x.min(obj_min.x);
+            min_bound.y = min_bound.y.min(obj_min.y);
+            min_bound.z = min_bound.z.min(obj_min.z);
+
+            max_bound.x = max_bound.x.max(obj_max.x);
+            max_bound.y = max_bound.y.max(obj_max.y);
+            max_bound.z = max_bound.z.max(obj_max.z);
+        }
+
+        if objects.is_empty() {
+            min_bound = Vec3::new(-1.0, -1.0, -1.0);
+            max_bound = Vec3::new(1.0, 1.0, 1.0);
+        }
+
+        Scene {
+            objects,
+            lights,
+            bounds: (min_bound, max_bound),
+        }
+    }
+
+    /// Actualiza todas las animaciones de materiales en los objetos de la escena para un tiempo dado (en segundos).
+    pub fn update_time(&mut self, time: f32) {
+        for obj in &mut self.objects {
+            obj.update_time(time);
+        }
+    }
+
+    /// Retorna si la escena contiene al menos un objeto con animación de textura.
+    pub fn has_animations(&self) -> bool {
+        self.objects.iter().any(|obj| obj.is_animated())
     }
 }
+
 
 /// Escena completa: Pirámide escalonada de losas rectangulares texturizadas, suelo de jade y dos esferas (espejo y vidrio).
 pub fn pyramid_with_spheres_scene() -> Scene {
