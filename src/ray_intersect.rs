@@ -177,6 +177,7 @@ pub enum Object {
 
 impl Object {
     /// Retorna la caja envolvente alineada a los ejes (AABB: min, max) del objeto en espacio de mundo.
+    #[allow(dead_code)]
     pub fn aabb(&self) -> (Vec3, Vec3) {
         match self {
             Object::Box3D(b) => (b.min, b.max),

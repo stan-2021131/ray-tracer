@@ -1,4 +1,3 @@
-#![allow(unused_imports)]
 mod box3d;
 mod camera;
 mod color;
@@ -21,9 +20,7 @@ use std::f32::consts::PI;
 use std::time::Duration;
 
 use crate::camera::{Camera, CameraMode};
-use crate::color::Color;
 use crate::framebuffer::Framebuffer;
-use crate::light::Light;
 use crate::renderer::render;
 use crate::skybox::Skybox;
 use crate::texture::TextureFilter;

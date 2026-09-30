@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 
 use crate::box3d::Box3D;
 use crate::color::Color;

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 
 use crate::texture::Texture;
 use std::sync::Arc;

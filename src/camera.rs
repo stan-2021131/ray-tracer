@@ -92,13 +92,6 @@ impl Camera {
         self.update_basis();
     }
 
-    /// Asigna explícitamente el modo de cámara.
-    #[allow(dead_code)]
-    pub fn set_mode(&mut self, mode: CameraMode) {
-        self.mode = mode;
-        self.update_basis();
-    }
-
     /// Actualiza la base ortonormal (forward, right, cam_up) según el modo activo.
     pub fn update_basis(&mut self) {
         match self.mode {

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 
 use crate::color::Color;
 use crate::ray_intersect::Material;
@@ -11,14 +10,11 @@ pub fn diffuse(color: Color) -> Material {
 }
 
 /// Plástico brillante con ligera reflectividad y brillo especular medio (estilo marfil).
+#[allow(dead_code)]
 pub fn ivory(color: Color) -> Material {
     Material::new(color, 0.6, 0.3, 0.1, 0.0, 50.0, 1.0)
 }
 
-/// Goma mate con baja especularidad y sin reflexión.
-pub fn rubber(color: Color) -> Material {
-    Material::new(color, 0.9, 0.1, 0.0, 0.0, 10.0, 1.0)
-}
 
 /// Material metálico con brillo especular alto y ligera reflexión.
 pub fn cobalt(color: Color) -> Material {
@@ -26,11 +22,13 @@ pub fn cobalt(color: Color) -> Material {
 }
 
 /// Mineral / gema pulida difusa con brillo medio (estilo jade).
+#[allow(dead_code)]
 pub fn jade(color: Color) -> Material {
     Material::new(color, 0.8, 0.25, 0.05, 0.0, 30.0, 1.0)
 }
 
 /// Espejo: material altamente reflectivo (85% reflexión especular indirecta) con tinte configurable.
+#[allow(dead_code)]
 pub fn mirror(tint: Color) -> Material {
     Material::new(tint, 0.1, 0.1, 0.85, 0.0, 125.0, 1.0)
 }
@@ -51,6 +49,7 @@ pub fn water(tint: Color) -> Material {
 }
 
 /// Metal pulido reflectivo (70% reflexión especular indirecta) con color metálico configurable (oro, bronce, cobre, etc.).
+#[allow(dead_code)]
 pub fn gold(color: Color) -> Material {
     Material::new(color, 0.2, 0.4, 0.7, 0.0, 100.0, 1.0)
 }
@@ -61,12 +60,14 @@ pub fn emissive(color: Color, intensity: f32) -> Material {
 }
 
 /// Aplica una textura desde un archivo a cualquier material base existente.
+#[allow(dead_code)]
 pub fn apply_texture(base_material: Material, texture_path: &str) -> Material {
     let texture = Arc::new(Texture::new(texture_path));
     base_material.with_texture(texture)
 }
 
 /// Aplica una secuencia de texturas animadas (ciclo de cuadros) a cualquier material base dado su framerate (FPS).
+#[allow(dead_code)]
 pub fn apply_animated_texture(
     base_material: Material,
     texture_paths: &[&str],

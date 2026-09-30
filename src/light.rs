@@ -41,14 +41,4 @@ impl Light {
             light_type: LightType::Point,
         }
     }
-
-    /// Crea una luz global sin atenuación por distancia (para Sol, Luna o ambiente).
-    pub fn directional(position: Vec3, color: Color, intensity: f32) -> Self {
-        Light {
-            position,
-            color,
-            intensity,
-            light_type: LightType::Directional,
-        }
-    }
 }
