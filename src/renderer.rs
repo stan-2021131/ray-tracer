@@ -62,43 +62,6 @@ pub fn fresnel(incident: &Vec3, normal: &Vec3, ior: f32) -> f32 {
     r0 + (1.0 - r0) * (1.0 - cosi).powi(5)
 }
 
-/// Comprueba si un rayo intersecta una caja alineada a los ejes (AABB).
-#[allow(dead_code)]
-#[inline]
-pub fn intersect_aabb(ray_origin: &Vec3, ray_direction: &Vec3, min: &Vec3, max: &Vec3) -> bool {
-    let inv_x = 1.0 / ray_direction.x;
-    let (t0x, t1x) = if ray_direction.x >= 0.0 {
-        ((min.x - ray_origin.x) * inv_x, (max.x - ray_origin.x) * inv_x)
-    } else {
-        ((max.x - ray_origin.x) * inv_x, (min.x - ray_origin.x) * inv_x)
-    };
-
-    let inv_y = 1.0 / ray_direction.y;
-    let (t0y, t1y) = if ray_direction.y >= 0.0 {
-        ((min.y - ray_origin.y) * inv_y, (max.y - ray_origin.y) * inv_y)
-    } else {
-        ((max.y - ray_origin.y) * inv_y, (min.y - ray_origin.y) * inv_y)
-    };
-
-    let tmin = t0x.max(t0y);
-    let tmax = t1x.min(t1y);
-
-    if tmin > tmax {
-        return false;
-    }
-
-    let inv_z = 1.0 / ray_direction.z;
-    let (t0z, t1z) = if ray_direction.z >= 0.0 {
-        ((min.z - ray_origin.z) * inv_z, (max.z - ray_origin.z) * inv_z)
-    } else {
-        ((max.z - ray_origin.z) * inv_z, (min.z - ray_origin.z) * inv_z)
-    };
-
-    let tmin = tmin.max(t0z);
-    let tmax = tmax.min(t1z);
-
-    tmax >= tmin.max(0.0)
-}
 
 /// Comprueba si el punto de intersección está bloqueado respecto a la fuente de luz por otro objeto.
 pub fn cast_shadow(
@@ -274,7 +237,7 @@ pub fn cast_ray(
     direct_color + reflect_contrib + refract_contrib
 }
 
-/// Renderiza la escena completa de forma multihilo en el framebuffer.
+/// Renderiza la escena completa en el framebuffer usando render_parallel para distribución multihilo.
 pub fn render(
     framebuffer: &mut Framebuffer,
     objects: &[Object],
@@ -285,51 +248,20 @@ pub fn render(
     let width = framebuffer.width as f32;
     let height = framebuffer.height as f32;
     let aspect_ratio = width / height;
-
-    let fb_width = framebuffer.width;
-    let fb_height = framebuffer.height;
     let perspective_scale = (FOV / 2.0).tan();
 
-    let num_threads = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4);
+    framebuffer.set_background_color(BACKGROUND_COLOR);
+    framebuffer.clear();
 
-    let rows_per_chunk = (fb_height + num_threads - 1) / num_threads;
+    framebuffer.render_parallel(|x, y| {
+        let screen_y = (-(2.0 * y as f32) / height + 1.0) * perspective_scale;
+        let screen_x = ((2.0 * x as f32) / width - 1.0) * aspect_ratio * perspective_scale;
 
-    std::thread::scope(|s| {
-        for (chunk_idx, chunk) in framebuffer
-            .buffer
-            .chunks_mut(rows_per_chunk * fb_width)
-            .enumerate()
-        {
-            let start_y = chunk_idx * rows_per_chunk;
+        let ray_direction = normalize(&Vec3::new(screen_x, screen_y, -1.0));
+        let ray_direction = camera.basis_change(&ray_direction);
 
-            s.spawn(move || {
-                for (local_y, row) in chunk.chunks_exact_mut(fb_width).enumerate() {
-                    let y = start_y + local_y;
-                    let screen_y = -(2.0 * y as f32) / height + 1.0;
-                    let screen_y = screen_y * perspective_scale;
-
-                    for (x, pixel) in row.iter_mut().enumerate() {
-                        let screen_x = (2.0 * x as f32) / width - 1.0;
-                        let screen_x = screen_x * aspect_ratio * perspective_scale;
-
-                        let ray_direction = normalize(&Vec3::new(screen_x, screen_y, -1.0));
-                        let ray_direction = camera.basis_change(&ray_direction);
-
-                        *pixel = cast_ray(
-                            &camera.eye,
-                            &ray_direction,
-                            objects,
-                            lights,
-                            skybox,
-                            0,
-                        )
-                        .to_hex();
-                    }
-                }
-            });
-        }
+        let color = cast_ray(&camera.eye, &ray_direction, objects, lights, skybox, 0);
+        color.to_hex()
     });
 }
 
@@ -374,20 +306,5 @@ mod tests {
         let kr_grazing = fresnel(&incident_grazing, &normal, 1.5);
         assert!(kr_grazing > 0.95);
     }
-
-    #[test]
-    fn test_intersect_aabb() {
-        let min = Vec3::new(-1.0, -1.0, -1.0);
-        let max = Vec3::new(1.0, 1.0, 1.0);
-
-        // Rayo que impacta de frente
-        let ray_orig = Vec3::new(0.0, 0.0, 5.0);
-        let ray_dir = Vec3::new(0.0, 0.0, -1.0);
-        assert!(intersect_aabb(&ray_orig, &ray_dir, &min, &max));
-
-        // Rayo que pasa de largo
-        let miss_orig = Vec3::new(5.0, 5.0, 5.0);
-        let miss_dir = Vec3::new(0.0, 0.0, -1.0);
-        assert!(!intersect_aabb(&miss_orig, &miss_dir, &min, &max));
-    }
 }
+
