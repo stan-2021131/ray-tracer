@@ -245,3 +245,17 @@ let screen_y = (-(2.0 * y as f32) / height + 1.0) * perspective_scale;
 - `aspect_ratio = W/H` corrige la deformación en pantallas no cuadradas.
 
 La dirección base `(screen_x, screen_y, -1)` apunta hacia `-Z` (frente de la cámara en espacio local). `camera.basis_change()` la rota al espacio de mundo según la orientación actual de la cámara.
+
+---
+
+## `render_telescope` — Visor Óptico y Zoom Telescópico ⭐
+
+Diseñado específicamente para la vista a través del telescopio:
+
+1. **Zoom Óptico (`TELESCOPE_FOV = PI / 6.0` / $30^\circ$)**: Reduce el campo de visión a la mitad respecto al diorama estándar ($60^\circ$), generando un aumento óptico de $2\times$ sobre planetas y cuerpos celestes distantes.
+2. **Máscara Circular de Lente Ocular**:
+   - Para cada píxel, calcula la distancia normalizada al centro de la pantalla:
+     $$r = \sqrt{\left(\frac{x - W/2}{H/2}\right)^2 + \left(\frac{y - H/2}{H/2}\right)^2}$$
+   - **Descarte Rápido Exterior (`r > 0.94`)**: Los píxeles fuera del radio del ocular retornan inmediatamente negro absoluto (`0x000000`) sin lanzar rayos primarios ni calcular intersecciones, optimizando drásticamente los fotogramas por segundo.
+   - **Viñeta Óptica Suave (`0.86 < r \le 0.94`)**: Atenúa suavemente el brillo en el borde del lente simulando el bisel del barril óptico.
+

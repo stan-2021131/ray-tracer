@@ -157,6 +157,16 @@ La proyección de `forward` y `right` sobre el plano XZ (`y = 0`) elimina la com
 
 ---
 
+## `CameraMode::Telescope` — Modo Telescopio Astronómico
+
+En este modo:
+- **Posición fija (`eye = (0, 0, 0)`)**: El jugador no se traslada con WASD (`move_player` ignora traslaciones).
+- **Rotación Panorámica 360° (`rotate_look`)**:
+  - `yaw`: Rotación horizontal ilimitada $360^\circ$ sobre el eje Y.
+  - `pitch`: Restringido estrictamente entre la línea del horizonte ($-0.05\,\text{rad} \approx -3^\circ$) y el cenit ($+1.45\,\text{rad} \approx +83^\circ$), impidiendo que el usuario mire hacia el suelo y manteniendo la inmersión cósmica.
+
+---
+
 ## Relación con el resto del motor
 
 | Módulo | Relación |
@@ -164,3 +174,5 @@ La proyección de `forward` y `right` sobre el plano XZ (`y = 0`) elimina la com
 | `renderer` | `camera.eye` como origen de rayos; `basis_change` para orientarlos |
 | `ray_intersect` | `check_collision` itera sobre `&[Object]` |
 | `box3d`, `sphere`, `plane` | Pruebas de colisión específicas por tipo |
+| `space_builder` | Cámara en origen para el panorama esférico 360° del espacio |
+

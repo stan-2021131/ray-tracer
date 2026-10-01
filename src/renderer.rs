@@ -237,6 +237,8 @@ pub fn cast_ray(
     direct_color + reflect_contrib + refract_contrib
 }
 
+pub const TELESCOPE_FOV: f32 = PI / 6.0;
+
 /// Renderiza la escena completa en el framebuffer usando render_parallel para distribución multihilo.
 pub fn render(
     framebuffer: &mut Framebuffer,
@@ -261,6 +263,54 @@ pub fn render(
         let ray_direction = camera.basis_change(&ray_direction);
 
         let color = cast_ray(&camera.eye, &ray_direction, objects, lights, skybox, 0);
+        color.to_hex()
+    });
+}
+
+/// Renderiza la vista telescópica con zoom óptico (FOV estrecho) y máscara circular de lente con viñeta exterior.
+pub fn render_telescope(
+    framebuffer: &mut Framebuffer,
+    objects: &[Object],
+    camera: &Camera,
+    lights: &[Light],
+    skybox: Option<&Skybox>,
+) {
+    let width = framebuffer.width as f32;
+    let height = framebuffer.height as f32;
+    let aspect_ratio = width / height;
+    let perspective_scale = (TELESCOPE_FOV / 2.0).tan();
+
+    framebuffer.set_background_color(0x000000);
+    framebuffer.clear();
+
+    let radius_outer = 0.94;
+    let radius_inner = 0.86;
+
+    framebuffer.render_parallel(|x, y| {
+        // Coordenadas normalizadas respecto al radio de la pantalla (círculo centrado)
+        let cx = (x as f32 - (width * 0.5)) / (height * 0.5);
+        let cy = (y as f32 - (height * 0.5)) / (height * 0.5);
+        let r = (cx * cx + cy * cy).sqrt();
+
+        // 1. Descarte inmediato fuera del ocular (negro absoluto y ahorro de cálculo de rayos)
+        if r > radius_outer {
+            return 0x000000;
+        }
+
+        let screen_y = (-(2.0 * y as f32) / height + 1.0) * perspective_scale;
+        let screen_x = ((2.0 * x as f32) / width - 1.0) * aspect_ratio * perspective_scale;
+
+        let ray_direction = normalize(&Vec3::new(screen_x, screen_y, -1.0));
+        let ray_direction = camera.basis_change(&ray_direction);
+
+        let mut color = cast_ray(&camera.eye, &ray_direction, objects, lights, skybox, 0);
+
+        // 2. Viñeta óptica suave en el borde del lente
+        if r > radius_inner {
+            let vignette = ((radius_outer - r) / (radius_outer - radius_inner)).clamp(0.0, 1.0);
+            color = color * vignette;
+        }
+
         color.to_hex()
     });
 }
@@ -306,5 +356,26 @@ mod tests {
         let kr_grazing = fresnel(&incident_grazing, &normal, 1.5);
         assert!(kr_grazing > 0.95);
     }
+
+    #[test]
+    fn test_render_telescope_mask() {
+        let mut fb = Framebuffer::new(100, 100);
+        let camera = Camera::new(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, -1.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        );
+        let objects = vec![];
+        let lights = vec![];
+
+        render_telescope(&mut fb, &objects, &camera, &lights, None);
+
+        // Las 4 esquinas (x=0, y=0), (x=99, y=0), etc. están fuera del radio circular de la lente y deben ser negro absoluto 0x000000
+        assert_eq!(fb.buffer[0], 0x000000, "La esquina superior izquierda debe ser negra");
+        assert_eq!(fb.buffer[99], 0x000000, "La esquina superior derecha debe ser negra");
+        assert_eq!(fb.buffer[99 * 100], 0x000000, "La esquina inferior izquierda debe ser negra");
+        assert_eq!(fb.buffer[99 * 100 + 99], 0x000000, "La esquina inferior derecha debe ser negra");
+    }
 }
+
 

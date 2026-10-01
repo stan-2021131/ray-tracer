@@ -1,3 +1,4 @@
+mod audio;
 mod box3d;
 mod camera;
 mod color;
@@ -10,6 +11,7 @@ mod ray_intersect;
 mod renderer;
 mod scene;
 mod skybox;
+mod space_builder;
 mod sphere;
 mod texture;
 mod texture_manager;
@@ -19,9 +21,10 @@ use nalgebra_glm::Vec3;
 use std::f32::consts::PI;
 use std::time::Duration;
 
+use crate::audio::AudioPlayer;
 use crate::camera::{Camera, CameraMode};
 use crate::framebuffer::Framebuffer;
-use crate::renderer::render;
+use crate::renderer::{render, render_telescope};
 use crate::skybox::Skybox;
 use crate::texture::TextureFilter;
 
@@ -29,6 +32,15 @@ const WIDTH: usize = 400;
 const HEIGHT: usize = 250;
 const ROTATION_SPEED: f32 = PI / 45.0;
 const MOVE_SPEED: f32 = 0.2;
+
+const TELESCOPE_POS: Vec3 = Vec3::new(9.0, 1.0, 7.5);
+const INTERACTION_RADIUS: f32 = 2.8;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GameSceneState {
+    Diorama,
+    Telescope,
+}
 
 fn main() {
     let frame_delay = Duration::from_millis(16);
@@ -46,9 +58,9 @@ fn main() {
     .unwrap();
 
     // ==========================================
-    // 1. SKYBOX NOCTURNO (CUBEMAP 6 CARAS)
+    // 1. SKYBOXES (DIORAMA Y ESPACIAL)
     // ==========================================
-    let skybox = Skybox::new(
+    let diorama_skybox = Skybox::new(
         "./textures/skybox/up.png",
         "./textures/skybox/down.png",
         "./textures/skybox/left.png",
@@ -58,11 +70,15 @@ fn main() {
     )
     .with_filter(TextureFilter::Nearest);
 
+    let space_skybox = Skybox::from_single_texture("./textures/skybox/space.png")
+        .with_filter(TextureFilter::Nearest)
+        .with_brightness(0.35);
+
     // ==========================================
-    // 2. SELECCIÓN DE ESCENA (OBJETOS Y LUCES)
+    // 2. SELECCIÓN DE ESCENAS (DIORAMA Y ESPACIAL)
     // ==========================================
-    // Escena Diorama exterior (o pyramid_only_scene / rectangular_structures_scene / spheres_scene)
-    let mut scene = scene::diorama_scene();
+    let mut diorama_scene = scene::diorama_scene();
+    let mut space_scene = scene::space_scene();
 
     let mut camera = Camera::new(
         Vec3::new(0.0, 20.0, 24.0),
@@ -70,104 +86,151 @@ fn main() {
         Vec3::new(0.0, 1.0, 0.0),
     );
 
+    let mut saved_diorama_camera = camera.clone();
+    let mut current_state = GameSceneState::Diorama;
+
     let start_time = std::time::Instant::now();
     let mut camera_moved = true;
     let mut tab_was_down = false;
     let mut c_was_down = false;
+    let mut e_was_down = false;
+    let mut esc_was_down = false;
 
     // ==========================================
-    // 3. BUCLE PRINCIPAL DE RENDER Y EVENTOS
+    // 3. SISTEMA DE AUDIO (MÚSICA + AMBIENTE)
     // ==========================================
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        // --- Reinicio de Cámara (R) ---
-        if window.is_key_down(Key::R) {
-            camera.reset(
-                Vec3::new(0.0, 20.0, 24.0),
-                Vec3::new(0.0, 2.0, -3.0),
-                Vec3::new(0.0, 1.0, 0.0),
-            );
-            window.set_title("Ray Tracer - [Modo: Orbit (Flechas para orbitar)] (Tab/C cambia, R reinicia)");
-            camera_moved = true;
+    let mut audio = AudioPlayer::new();
+    audio.start_all();
+
+    // ==========================================
+    // 4. BUCLE PRINCIPAL DE RENDER Y EVENTOS
+    // ==========================================
+    while window.is_open() {
+        let esc_down = window.is_key_down(Key::Escape);
+        let e_down = window.is_key_down(Key::E);
+
+        // --- Gestión de Transiciones de Escena (E / ESC) ---
+        if current_state == GameSceneState::Telescope {
+            if (e_down && !e_was_down) || (esc_down && !esc_was_down) {
+                camera = saved_diorama_camera.clone();
+                current_state = GameSceneState::Diorama;
+                window.set_title("Ray Tracer - [Modo: Orbit (Flechas para orbitar)] (Tab/C cambia, R reinicia)");
+                camera_moved = true;
+                e_was_down = e_down;
+                esc_was_down = esc_down;
+                continue;
+            }
+        } else {
+            if esc_down {
+                break; // Salir de la aplicación desde el Diorama
+            }
+
+            let dist_to_telescope = (camera.eye - TELESCOPE_POS).magnitude();
+            let is_near_telescope = dist_to_telescope <= INTERACTION_RADIUS;
+
+            if is_near_telescope && e_down && !e_was_down {
+                saved_diorama_camera = camera.clone();
+                current_state = GameSceneState::Telescope;
+                camera.mode = CameraMode::Telescope;
+                camera.eye = Vec3::new(0.0, 0.0, 0.0);
+                camera.yaw = 0.0;
+                camera.pitch = 0.35;
+                camera.update_basis();
+
+                window.set_title("Ray Tracer - [Vista Espacial 360°] (Flechas: rotar 360°, [E]/[ESC]: regresar)");
+                camera_moved = true;
+                e_was_down = e_down;
+                esc_was_down = esc_down;
+                continue;
+            }
+
+            // Atajos de cámara en Diorama
+            if window.is_key_down(Key::R) {
+                camera.reset(Vec3::new(0.0, 20.0, 24.0), Vec3::new(0.0, 2.0, -3.0), Vec3::new(0.0, 1.0, 0.0));
+                window.set_title("Ray Tracer - [Modo: Orbit (Flechas para orbitar)] (Tab/C cambia, R reinicia)");
+                camera_moved = true;
+            }
+
+            let tab_down = window.is_key_down(Key::Tab);
+            let c_down = window.is_key_down(Key::C);
+            if (tab_down && !tab_was_down) || (c_down && !c_was_down) {
+                let mode = camera.toggle_mode();
+                let mode_name = match mode {
+                    CameraMode::Orbit => "Orbit (Flechas para orbitar)",
+                    CameraMode::FpsCollision => "FPS Colisiones (WASD caminar, Flechas mirar)",
+                    CameraMode::FreeCam => "FreeCam (WASD + Q/E volar, Flechas mirar)",
+                    CameraMode::Telescope => "Telescopio",
+                };
+                window.set_title(&format!("Ray Tracer - [Modo: {}] (Tab/C cambia, R reinicia)", mode_name));
+                camera_moved = true;
+            }
+            tab_was_down = tab_down;
+            c_was_down = c_down;
+
+            if is_near_telescope && matches!(camera.mode, CameraMode::FpsCollision | CameraMode::FreeCam) {
+                window.set_title("Ray Tracer - [E] Mirar por el Telescopio (Tab/C cambia modo)");
+            }
+
+            // Movimiento WASD del jugador en Diorama
+            let mut f_in = 0.0; let mut s_in = 0.0; let mut u_in = 0.0;
+            if window.is_key_down(Key::W) { f_in += 1.0; }
+            if window.is_key_down(Key::S) { f_in -= 1.0; }
+            if window.is_key_down(Key::D) { s_in += 1.0; }
+            if window.is_key_down(Key::A) { s_in -= 1.0; }
+            if window.is_key_down(Key::Q) { u_in += 1.0; }
+            if window.is_key_down(Key::E) && !is_near_telescope { u_in -= 1.0; }
+
+            if f_in != 0.0 || s_in != 0.0 || u_in != 0.0 {
+                camera.move_player(f_in, s_in, u_in, MOVE_SPEED, &diorama_scene.objects);
+                if matches!(camera.mode, CameraMode::FpsCollision) && (f_in != 0.0 || s_in != 0.0) {
+                    audio.try_play_footstep();
+                }
+                camera_moved = true;
+            }
         }
 
-        // --- Conmutación de Modo de Cámara (Tab o C) ---
-        let tab_down = window.is_key_down(Key::Tab);
-        let c_down = window.is_key_down(Key::C);
-
-        if (tab_down && !tab_was_down) || (c_down && !c_was_down) {
-            let mode = camera.toggle_mode();
-            let mode_name = match mode {
-                CameraMode::Orbit => "Orbit (Flechas para orbitar)",
-                CameraMode::FpsCollision => "FPS Colisiones (WASD caminar, Flechas mirar)",
-                CameraMode::FreeCam => "FreeCam (WASD + Q/E volar, Flechas mirar)",
-            };
-            window.set_title(&format!("Ray Tracer - [Modo: {}] (Tab/C cambia, R reinicia)", mode_name));
-            camera_moved = true;
-        }
-        tab_was_down = tab_down;
-        c_was_down = c_down;
-
-        // --- Rotación / Dirección de Vista (Flechas) ---
+        // --- Rotación Unificada (Flechas) ---
         let rot_inputs = [
             (Key::Left, ROTATION_SPEED, 0.0),
             (Key::Right, -ROTATION_SPEED, 0.0),
             (Key::Up, 0.0, -ROTATION_SPEED),
             (Key::Down, 0.0, ROTATION_SPEED),
         ];
-
-        for (key, delta_yaw, delta_pitch) in rot_inputs {
+        for (key, dy, dp) in rot_inputs {
             if window.is_key_down(key) {
-                match camera.mode {
-                    CameraMode::Orbit => camera.orbit(delta_yaw, delta_pitch),
-                    CameraMode::FpsCollision | CameraMode::FreeCam => {
-                        // En primera persona: flecha izquierda gira izquierda, flecha arriba mira arriba
-                        camera.rotate_look(-delta_yaw, -delta_pitch);
-                    }
+                if camera.mode == CameraMode::Orbit {
+                    camera.orbit(dy, dp);
+                } else {
+                    camera.rotate_look(-dy, -dp);
                 }
                 camera_moved = true;
             }
         }
 
-        // --- Desplazamiento del Jugador / Cámara (WASD + Espacio / Shift) ---
-        let mut forward_input = 0.0;
-        let mut strafe_input = 0.0;
-        let mut up_input = 0.0;
-
-        if window.is_key_down(Key::W) { forward_input += 1.0; }
-        if window.is_key_down(Key::S) { forward_input -= 1.0; }
-        if window.is_key_down(Key::D) { strafe_input += 1.0; }
-        if window.is_key_down(Key::A) { strafe_input -= 1.0; }
-        if window.is_key_down(Key::Q) { up_input += 1.0; }
-        if window.is_key_down(Key::E) { up_input -= 1.0; }
-
-        if forward_input != 0.0 || strafe_input != 0.0 || up_input != 0.0 {
-            camera.move_player(
-                forward_input,
-                strafe_input,
-                up_input,
-                MOVE_SPEED,
-                &scene.objects,
-            );
-            camera_moved = true;
-        }
-
-        // --- Actualización de animaciones y renderizado reactivo ---
+        // --- Renderizado Reactivo ---
         let elapsed = start_time.elapsed().as_secs_f32();
-        let has_animations = scene.has_animations();
+        let (active_scene, is_telescope) = match current_state {
+            GameSceneState::Diorama => (&mut diorama_scene, false),
+            GameSceneState::Telescope => (&mut space_scene, true),
+        };
+
+        let has_animations = active_scene.has_animations();
         if has_animations {
-            scene.update_time(elapsed);
+            active_scene.update_time(elapsed);
         }
 
         if camera_moved || has_animations {
-            render(
-                &mut framebuffer,
-                &scene.objects,
-                &camera,
-                &scene.lights,
-                Some(&skybox),
-            );
+            if is_telescope {
+                // En el espacio: skybox cósmico omnidireccional con transparencia y visor telescópico
+                render_telescope(&mut framebuffer, &active_scene.objects, &camera, &active_scene.lights, Some(&space_skybox));
+            } else {
+                render(&mut framebuffer, &active_scene.objects, &camera, &active_scene.lights, Some(&diorama_skybox));
+            }
             camera_moved = false;
         }
+
+        e_was_down = e_down;
+        esc_was_down = esc_down;
 
         window
             .update_with_buffer(&framebuffer.buffer, WIDTH, HEIGHT)

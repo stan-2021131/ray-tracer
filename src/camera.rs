@@ -14,8 +14,11 @@ pub enum CameraMode {
     FpsCollision,
     /// Modo vuelo libre (FreeCam / Noclip): desplazamiento 3D sin restricciones físicas.
     FreeCam,
+    /// Modo telescopio: vista óptica fija con rotación horizontal y elevación hacia el cielo.
+    Telescope,
 }
 
+#[derive(Debug, Clone)]
 pub struct Camera {
     pub eye: Vec3,
     pub center: Vec3,
@@ -69,7 +72,7 @@ impl Camera {
                 CameraMode::FpsCollision
             }
             CameraMode::FpsCollision => CameraMode::FreeCam,
-            CameraMode::FreeCam => {
+            CameraMode::FreeCam | CameraMode::Telescope => {
                 // Al volver a Orbit, colocamos center a una distancia fija hacia adelante
                 self.center = self.eye + self.forward * 4.0;
                 CameraMode::Orbit
@@ -104,7 +107,7 @@ impl Camera {
                 self.right = right;
                 self.cam_up = cam_up;
             }
-            CameraMode::FpsCollision | CameraMode::FreeCam => {
+            CameraMode::FpsCollision | CameraMode::FreeCam | CameraMode::Telescope => {
                 let cos_pitch = self.pitch.cos();
                 let forward = Vec3::new(
                     self.yaw.sin() * cos_pitch,
@@ -146,11 +149,23 @@ impl Camera {
         self.update_basis();
     }
 
-    /// Rota la orientación de la vista (cabeceo y giro de cabeza) en modos FPS y FreeCam.
+    /// Rota la orientación de la vista (cabeceo y giro de cabeza).
+    /// En modo telescopio restringe el pitch hacia el cielo (-0.05 a 1.45 rad).
     pub fn rotate_look(&mut self, delta_yaw: f32, delta_pitch: f32) {
         self.yaw = (self.yaw + delta_yaw) % (2.0 * PI);
-        self.pitch = (self.pitch + delta_pitch).clamp(-PITCH_LIMIT, PITCH_LIMIT);
+        let limit = if self.mode == CameraMode::Telescope {
+            (-0.05, 1.45)
+        } else {
+            (-PITCH_LIMIT, PITCH_LIMIT)
+        };
+        self.pitch = (self.pitch + delta_pitch).clamp(limit.0, limit.1);
         self.update_basis();
+    }
+
+    /// Rota la orientación en modo telescopio: yaw libre 360°, pitch restringido hacia el cielo (-0.05 a 1.45 rad).
+    #[allow(dead_code)]
+    pub fn rotate_look_telescope(&mut self, delta_yaw: f32, delta_pitch: f32) {
+        self.rotate_look(delta_yaw, delta_pitch);
     }
 
     /// Comprueba si una posición espacial 3D colisiona con algún objeto sólido de la escena.
@@ -243,6 +258,9 @@ impl Camera {
 
                 self.eye += move_vec;
                 self.update_basis();
+            }
+            CameraMode::Telescope => {
+                // En modo telescopio, la posición del observador es fija (sin traslación)
             }
         }
     }
