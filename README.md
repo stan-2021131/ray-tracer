@@ -20,38 +20,52 @@ Todo el cálculo matemático, intersección analítica y procesamiento de imáge
 
 ---
 
-## Descripción del Diorama
+## Descripción del Diorama y Escena Espacial
 
-La escena principal consiste en un **diorama exterior nocturno** modelado de manera modular con bloques y estructuras geométricas:
+El proyecto incluye dos escenarios interactivos interconectados:
 
+### 1. Diorama Exterior Nocturno (Escena Principal)
+Modelado de manera modular con bloques y estructuras geométricas:
 - **Terreno y Topografía Modular**: Base estratificada compuesta por capas de tierra (`dirt.png`), superficie de césped (`grass.png`) y un sendero empedrado central (`path.png` / `stone.png`).
-- **Estanque de Agua Refractiva**: Zona excavada que contiene un bloque de agua transparente con índice de refracción físico ($IOR = 1.333$), reflexión Fresnel y textura translúcida.
-- **Muelle**: Muelle de madera oscura que se extiende sobre el agua.
-- **Fogata con Textura Animada**: Área de campamento con fuego y columna de humo animados mediante ciclos de texturas secuenciales por fotogramas y emisión de luz propia.
-- **Puesto de Observación Astronómica**: Telescopio detallado construido con juntas metálicas reflectantes de cobalto sobre un trípode orientable.
-- **Iluminación de Farolas y Postes**: Postes metálicos con faroles de vidrio ($IOR = 1.52$) que albergan bombillas emisivas y proyectan luz puntual cálida sobre el entorno.
-- **Vegetación y Naturaleza**: Árboles volumétricos con troncos de madera y copas de follaje denso (`leaves.png`), acompañados de flores y plantas variadas implementadas con corte alfa (*alpha cutout*).
+- **Estanque de Agua Refractiva**: Zona excavada con agua transparente ($IOR = 1.333$), reflexión Fresnel y textura translúcida.
+- **Muelle y Puentes**: Estructuras de madera sobre el agua.
+- **Fogata con Textura Animada**: Área de campamento con fuego y humo animados mediante ciclos de texturas secuenciales por fotogramas y emisión de luz propia.
+- **Puesto de Observación Astronómica**: Telescopio interactivo con juntas metálicas reflectantes de cobalto sobre un trípode orientable.
+- **Iluminación de Farolas**: Postes metálicos con faroles de vidrio ($IOR = 1.52$) que albergan bombillas emisivas y proyectan luz puntual cálida sobre el entorno.
+- **Vegetación**: Árboles volumétricos (`leaves.png`) y plantas variadas implementadas con corte alfa (*alpha cutout*).
+
+### 2. Vista Planetaria y Espacial 360° (Telescopio)
+Al acercarse a la plataforma del telescopio y presionar `[E]`, la cámara se traslada al ocular del telescopio:
+- **Visor Óptico y Zoom**: Renderizado circular con máscara de lente, viñeta perimetral y campo de visión estrecho ($FOV = 30^\circ$, aumento $2\times$).
+- **La Luna y Cuerpos Celestes**: Luna prominente y planetas a diversas profundidades (Júpiter, Marte, Neptuno, planetas anillados, exoplanetas).
+- **Campo Estelar Denso**: 260 estrellas emisivas de 10 tonalidades espectrales repartidas en toda la bóveda de 360°.
+- **Naves, OVNIs y Meteoritos**: Planos orientados mirando al observador con corte de transparencia (*Alpha Cutout*).
+- **Skybox Cósmico**: Fondo omnidireccional (`space.png`) con soporte de transparencia y atenuación de brillo para máximo contraste.
 
 ---
 
 ## Características Principales
 
 - **Trazado de Rayos 100% CPU**: Sin aceleración GPU ni APIs externas como OpenGL o Vulkan.
+- **Escenarios Interconectados**: Transición fluida entre el diorama terrestre y la vista telescópica astronómica.
+- **Visor Óptico Telescópico**: Zoom $2\times$ con máscara circular de lente y descarte rápido de rayos exteriores.
 - **Caja Orientada y AABB Ultrarrápida (`Box3D`)**: Detección de colisiones e intersecciones mediante el algoritmo **Slab Method** con soporte para rotación sobre el eje Y.
-- **Plano Finito con Alpha Cutout (`Plane`)**: Rectángulos orientables en el espacio con recorte de transparencia para vegetación.
-- **Esfera Analítica (`Sphere`)**: Intersección cuadrática exacta con cálculo de normales y mapeo esférico UV.
+- **Plano Finito con Alpha Cutout (`Plane`)**: Rectángulos orientables en el espacio con recorte de transparencia para vegetación, naves, OVNIs y meteoritos.
+- **Esfera Analítica (`Sphere`)**: Intersección cuadrática exacta con cálculo de normales y mapeo esférico UV para planetas, luna y estrellas.
 - **Materiales Ópticos Avanzados**:
   - Difuso Lambertiano y especular Phong.
   - Reflexión especular recursiva (metales, espejos, ventanas).
   - Refracción con Ley de Snell, Reflexión Interna Total (TIR) y ecuaciones de Fresnel (Schlick).
-  - Materiales emisivos con iluminación propia.
+  - Materiales emisivos con iluminación propia y auto-luminosidad cósmica.
   - Texturas estáticas y animadas por fotogramas (fuego/humo).
-- **Skybox Cubemap de 6 Caras**: Fondo ambiental espacial y nocturno con proyección cúbica continua sin costuras.
+- **Skybox Cubemap y Fondo Cósmico**: Proyección cúbica continua de 6 caras para el diorama y skybox espacial con mezcla alfa y atenuación de brillo configurable.
 - **Cámara Interactiva Multimodo**:
   - Modo Orbital con rotación en ambos ejes y Zoom continuo (acercar/alejar).
   - Modo Primera Persona (FPS) con detección de colisiones físicas en paredes y suelo.
   - Modo Vuelo Libre (FreeCam) tridimensional.
+  - Modo Telescopio con rotación panorámica 360° y límites de elevación hacia el cielo.
 - **Paralelismo Multihilo Nativo**: Particionado de pantalla en paralelo mediante `std::thread::scope` en el Framebuffer.
+- **Sistema de Audio y Sonido Ambiental**: Reproducción simultánea en bucle de música de fondo, ambiente nocturno y pasos en modo FPS.
 
 ---
 
@@ -61,30 +75,34 @@ La escena principal consiste en un **diorama exterior nocturno** modelado de man
 ray-tracer/
 ├── Cargo.toml                  # Dependencias y perfiles de compilación
 ├── README.md                   # Documentación principal del proyecto
+├── assets/                     # Archivos de audio (música, ambiente y pasos)
 ├── docs/                       # Documentación técnica modular y recursos multimedia
 │   └── modules/                # Guías detalladas por cada componente del motor
 ├── textures/                   # Atlas de texturas PNG y JPG
 │   ├── campfire/               # Secuencias animadas de fuego y humo
 │   ├── plants/                 # Sprites de plantas y flores
-│   ├── skybox/                 # 6 caras del Cubemap nocturno
+│   ├── skybox/                 # 6 caras del Cubemap nocturno y textura space.png
+│   ├── space/                  # Texturas astronómicas (moon, jupiter, mars, ufo, etc.)
 │   └── *.png                   # Texturas de bloques (grass, dirt, wood, stone, etc.)
 └── src/
-    ├── main.rs                 # Inicialización de ventana, bucle de eventos y render
+    ├── main.rs                 # Inicialización de ventana, bucle de eventos y gestión de escenas
+    ├── audio.rs                # Sistema de audio (música, ambiente y SFX en bucle)
     ├── diorama_builder.rs      # Construcción procedural de la escena del diorama
-    ├── renderer.rs             # Trazador de rayos (cast_ray, shade, reflect, refract, fresnel)
+    ├── space_builder.rs        # Construcción procedural de la escena espacial 360°
+    ├── renderer.rs             # Trazador de rayos (render, render_telescope, cast_ray, shade, reflect, refract)
     ├── framebuffer.rs          # Buffer de pantalla y render_parallel multihilo
-    ├── camera.rs               # Cámara orbital, FPS con colisiones y FreeCam
+    ├── camera.rs               # Cámara orbital, FPS con colisiones, FreeCam y Telescopio
     ├── ray_intersect.rs        # Traits, tipos de intersección y definición de Material
     ├── box3d.rs                # Primitiva Box3D (Slab method y rotación OBB)
     ├── plane.rs                # Primitiva Plane (rectángulo finito y alpha cutout)
     ├── sphere.rs               # Primitiva Sphere analítica
-    ├── skybox.rs               # Skybox Cubemap de 6 caras y muestreo UV
+    ├── skybox.rs               # Skybox Cubemap de 6 caras, atenuación y muestreo UV
     ├── materials.rs            # Catálogo y constructores de materiales ópticos
     ├── texture.rs              # Carga y muestreo UV (Nearest/Bilinear, Repeat/Clamp)
     ├── texture_manager.rs      # Gestor y caché centralizada de texturas (Arc<Texture>)
     ├── light.rs                # Fuentes de luz puntuales y direccionales
     ├── color.rs                # Manejo de color RGB y conversiones hex/aritméticas
-    └── scene.rs                # Contenedor de escena, objetos y animaciones
+    └── scene.rs                # Contenedor de escenas, objetos y animaciones
 ```
 
 ---
@@ -92,23 +110,29 @@ ray-tracer/
 ## Fundamentos Técnicos del Motor
 
 ### 1. Trazado de Rayos, Iluminación y Sombras (`renderer.rs`)
-Para cada píxel de la pantalla, se genera un rayo primario proyectado según el campo de visión ($FOV = 60^\circ$) y la orientación de la cámara. Al impactar una superficie, se evalúa el modelo de sombreado **Phong** combinando la luz difusa (Lambertiana) y el brillo especular. Para cada fuente luminosa, se lanza un rayo de sombra (*shadow ray*) con desplazamiento antipoligonado (*shadow bias*); si un objeto ocluye la trayectoria hacia la luz, el punto queda en penumbra.
+Para cada píxel de la pantalla, se genera un rayo primario proyectado según el campo de visión ($FOV = 60^\circ$ en diorama, $FOV = 30^\circ$ en telescopio) y la orientación de la cámara. Al impactar una superficie, se evalúa el modelo de sombreado **Phong** combinando la luz difusa (Lambertiana) y el brillo especular. Para cada fuente luminosa, se lanza un rayo de sombra (*shadow ray*) con desplazamiento antipoligonado (*shadow bias*); si un objeto ocluye la trayectoria hacia la luz, el punto queda en penumbra.
 
-### 2. Reflexión, Refracción y Fresnel (`renderer.rs`)
+### 2. Visor Óptico Telescópico (`renderer.rs`)
+La función `render_telescope` aplica una máscara circular donde los píxeles con radio normalizado $r > 0.94$ retornan negro inmediato (`0x000000`) sin evaluar rayos, mientras que el rango $0.86 < r \le 0.94$ aplica una viñeta de atenuación suave simulando el ocular físico.
+
+### 3. Reflexión, Refracción y Fresnel (`renderer.rs`)
 Los materiales reflectivos y dieléctricos generan rayos secundarios recursivos (hasta una profundidad máxima `MAX_DEPTH = 3`):
 - **Reflexión**: Calculada como $\vec{R} = \vec{I} - 2(\vec{I} \cdot \vec{N})\vec{N}$.
 - **Refracción (Snell)**: Desvía el rayo según la relación de índices de refracción $\eta = \eta_i / \eta_t$. Si el ángulo excede el ángulo crítico, se gestiona la **Reflexión Interna Total (TIR)**.
 - **Fresnel (Schlick)**: Determina la proporción de energía reflejada versus refractada según el ángulo de incidencia:
   $$R(\theta) = R_0 + (1 - R_0)(1 - \cos\theta)^5 \quad \text{donde} \quad R_0 = \left(\frac{\eta_1 - \eta_2}{\eta_1 + \eta_2}\right)^2$$
 
-### 3. Cajas 3D y Algoritmo Slab Method (`box3d.rs`)
+### 4. Cajas 3D y Algoritmo Slab Method (`box3d.rs`)
 Los bloques del diorama utilizan la prueba de intersección AABB mediante el método de los intervalos (*Slab Method*), calculando las distancias de entrada y salida $t_{\min}$ y $t_{\max}$ en los tres ejes cartesianos de manera simultánea. Permite además rotación en el eje Y mediante transformación de rayos al espacio local del objeto (OBB).
 
-### 4. Skybox Cubemap de 6 Caras (`skybox.rs`)
-El entorno que envuelve la escena se proyecta sobre 6 planos ortogonales (`up`, `down`, `left`, `right`, `front`, `back`). Al evaluar rayos que escapan al infinito, se identifica el eje cartesiano dominante del vector de dirección para muestrear la cara correcta con coordenadas UV continuas y filtrado de texturas.
+### 5. Skybox Cubemap y Fondo Cósmico (`skybox.rs`)
+El entorno que envuelve la escena se proyecta sobre 6 planos ortogonales (`up`, `down`, `left`, `right`, `front`, `back`). Soporta carga omnidireccional con `from_single_texture`, mezcla con canal alfa para texturas transparentes y atenuación de brillo con `with_brightness`.
 
-### 5. Multithreading Nativo (`framebuffer.rs`)
+### 6. Multithreading Nativo (`framebuffer.rs`)
 La función `Framebuffer::render_parallel` divide la altura total del framebuffer en bloques horizontales de filas equitativas, asignando cada bloque a un hilo de procesamiento independiente mediante `std::thread::scope` y `std::thread::available_parallelism()`.
+
+### 7. Sistema de Audio y Sonido Ambiental (`audio.rs`)
+Permite la mezcla asíncrona no bloqueante de dos pistas en bucle infinito simultáneo (música de fondo y sonido ambiental) con canales independientes y volúmenes balanceados (`35%` y `15%`), además de efectos sonoros de pasos interactivos en modo primera persona.
 
 > [!TIP]
 > Para consultar la explicación matemática exhaustiva, fórmulas y diagramas de cada módulo, revisa los documentos en la carpeta [`docs/modules/`](docs/modules/).
@@ -117,16 +141,17 @@ La función `Framebuffer::render_parallel` divide la altura total del framebuffe
 
 ## Controles de la Aplicación
 
-| Control | Acción |
-| :--- | :--- |
-| **$\leftarrow$ / $\rightarrow$** | Rotar cámara horizontalmente (*Yaw*) |
-| **$\uparrow$ / $\downarrow$** | Rotar cámara verticalmente (*Pitch*) |
-| **`W` / `S`** | **Acercar / Alejar la cámara (Zoom)** en modo Órbita (o avanzar/retroceder en FPS) |
-| **`A` / `D`** | Desplazamiento lateral (*Strafe*) en modo FPS / FreeCam |
-| **`Q` / `E`** | Elevar / Descender cámara en modo FreeCam |
-| **`Tab` o `C`** | Alternar modo de cámara (`Orbit` $\rightarrow$ `FPS con colisiones` $\rightarrow$ `FreeCam`) |
-| **`R`** | Restablecer la cámara a la posición y ángulo original |
-| **`Escape`** | Cerrar la aplicación y salir |
+| Control | Acción en Diorama | Acción en Vista Telescópica |
+| :--- | :--- | :--- |
+| **$\leftarrow$ / $\rightarrow$** | Rotar cámara horizontalmente (*Yaw*) | Rotar vista panorámica 360° |
+| **$\uparrow$ / $\downarrow$** | Rotar cámara verticalmente (*Pitch*) | Inclinar vista hacia el cielo |
+| **`W` / `S`** | **Zoom (Acercar/Alejar)** en Órbita / Caminar en FPS | — |
+| **`A` / `D`** | Desplazamiento lateral (*Strafe*) en FPS / FreeCam | — |
+| **`Q` / `E`** | Elevar / Descender cámara en FreeCam | — |
+| **`E`** | **Mirar por el Telescopio** (cerca del telescopio) | **Regresar al Diorama** |
+| **`Escape`** | Cerrar la aplicación y salir | **Regresar al Diorama** |
+| **`Tab` o `C`** | Alternar modo (`Orbit` $\rightarrow$ `FPS` $\rightarrow$ `FreeCam`) | — |
+| **`R`** | Restablecer la cámara a la posición original | — |
 
 ---
 
@@ -183,3 +208,4 @@ Para más detalles sobre la arquitectura interna, matemáticas y diseño de cada
 - [Skybox Cubemap](docs/modules/skybox.md)
 - [Esferas Analíticas](docs/modules/sphere.md)
 - [Muestreo y Gestión de Texturas](docs/modules/texture.md)
+- [Sistema de Audio y Sonido Ambiental](docs/modules/audio.md)
