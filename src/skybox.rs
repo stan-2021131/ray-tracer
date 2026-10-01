@@ -36,6 +36,7 @@ pub struct Skybox {
     pub filter: TextureFilter,
     pub rotation_y: f32,
     pub has_rotation: bool,
+    pub brightness: f32,
 }
 
 impl Skybox {
@@ -61,7 +62,26 @@ impl Skybox {
             filter: TextureFilter::Nearest,
             rotation_y: 0.0,
             has_rotation: false,
+            brightness: 1.0,
         }
+    }
+
+    /// Crea un Skybox asignando la misma textura en las 6 caras (útil para fondos omnidireccionales o patrones cósmicos).
+    pub fn from_single_texture(texture_path: &str) -> Self {
+        Self::new(
+            texture_path,
+            texture_path,
+            texture_path,
+            texture_path,
+            texture_path,
+            texture_path,
+        )
+    }
+
+    /// Permite configurar el brillo / atenuación general del Skybox (patrón Builder).
+    pub fn with_brightness(mut self, brightness: f32) -> Self {
+        self.brightness = brightness.clamp(0.0, 5.0);
+        self
     }
 
     /// Permite configurar el modo de filtrado de textura (patrón Builder).
@@ -209,14 +229,32 @@ impl Skybox {
         let (face, u, v) = Self::get_face_and_uv(&dir);
 
         // Muestrear textura correspondiente usando el filtro configurado
-        match face {
+        let mut color = match face {
             CubemapFace::Right => self.right.get_color_filtered(u, v, self.filter),
             CubemapFace::Left => self.left.get_color_filtered(u, v, self.filter),
             CubemapFace::Up => self.up.get_color_filtered(u, v, self.filter),
             CubemapFace::Down => self.down.get_color_filtered(u, v, self.filter),
             CubemapFace::Front => self.front.get_color_filtered(u, v, self.filter),
             CubemapFace::Back => self.back.get_color_filtered(u, v, self.filter),
+        };
+
+        // Soporte nativo para texturas de skybox con canal alfa / transparencia:
+        // Mezcla alfa sobre el vacío negro del espacio
+        if color.a < 255 {
+            let alpha = color.a as f32 / 255.0;
+            color = Color::new(
+                (color.r as f32 * alpha).round() as u8,
+                (color.g as f32 * alpha).round() as u8,
+                (color.b as f32 * alpha).round() as u8,
+            );
         }
+
+        // Aplicar atenuación / brillo configurado
+        if (self.brightness - 1.0).abs() > 1e-4 {
+            color = color * self.brightness;
+        }
+
+        color
     }
 }
 

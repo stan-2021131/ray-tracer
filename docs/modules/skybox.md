@@ -145,6 +145,24 @@ Los rayos de reflexión que "miran al cielo" también consultan el skybox, lo qu
 
 ---
 
+## Constructores y Métodos Builder
+
+- **`Skybox::new(up, down, left, right, front, back)`**: Carga las 6 caras ortogonales independientes.
+- **`Skybox::from_single_texture(path)`**: Asigna la misma textura a las 6 caras (ideal para patrones cósmicos omnidireccionales como `textures/skybox/space.png`).
+- **`with_filter(filter)`**: Configura el filtrado `Nearest` o `Bilinear`.
+- **`with_brightness(brightness)`**: Escala linealmente el brillo del fondo (por ejemplo, `0.35` para atenuar la nebulosa de fondo y resaltar estrellas emisivas).
+- **`with_rotation_y(radians)`**: Rota el domo en el eje horizontal.
+
+---
+
+## Soporte de Canal Alfa / Transparencia
+
+Cuando las texturas del skybox contienen píxeles transparentes o semitransparentes (`color.a < 255`), `Skybox::sample` realiza automáticamente una mezcla alfa sobre el vacío negro del espacio (`0x000000`):
+
+$$\text{color\_final} = \text{color} \cdot \left(\frac{\text{alpha}}{255}\right) \cdot \text{brightness}$$
+
+---
+
 ## Relación con el resto del motor
 
 | Módulo | Relación |
@@ -152,3 +170,5 @@ Los rayos de reflexión que "miran al cielo" también consultan el skybox, lo qu
 | `renderer` | `cast_ray` consulta `skybox.sample()` cuando no hay impacto |
 | `texture` | Cada cara es una `Texture` con su propio buffer de `Color` |
 | `color` | `sample` devuelve un `Color` directamente al renderer |
+| `main` | Gestiona `diorama_skybox` y `space_skybox` según la escena activa |
+

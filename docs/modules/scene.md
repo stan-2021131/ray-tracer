@@ -66,7 +66,11 @@ Escena técnica que demuestra las capacidades del motor sin depender de assets e
 
 ### `diorama_scene() -> Scene`
 
-Delega a `diorama_builder::build_diorama_scene()`. Su propósito es separar la lógica de construcción de escena del módulo `scene`.
+Delega a `diorama_builder::build_diorama_scene()`. Su propósito es construir el diorama exterior modular completo.
+
+### `space_scene() -> Scene`
+
+Delega a `space_builder::build_space_scene()`. Construye el panorama astronómico en 360° con la Luna, planetas a distintas profundidades, constelaciones densas de estrellas emisivas y planos orientados (OVNIs, naves, meteoritos).
 
 ---
 

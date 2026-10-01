@@ -36,6 +36,11 @@ pub fn diorama_scene() -> Scene {
     crate::diorama_builder::build_diorama_scene()
 }
 
+/// Escena espacial con planetas, luna, estrellas y naves observadas por el telescopio.
+pub fn space_scene() -> Scene {
+    crate::space_builder::build_space_scene()
+}
+
 /// Escena técnica demostrativa: muestra las capacidades del motor (materiales, reflexión, refracción, texturas)
 /// usando esferas, cubos y planos en materiales variados. No depende de los assets del diorama.
 ///
