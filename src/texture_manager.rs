@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 /// Administrador centralizado de recursos de texturas e imágenes de la aplicación.
 /// Carga, almacena en caché y distribuye instancias `Arc<Texture>` para evitar duplicaciones en memoria.
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct TextureManager {
     pub grass: Arc<Texture>,

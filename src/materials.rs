@@ -45,7 +45,7 @@ pub fn glass(tint: Color) -> Material {
 
 /// Agua: material transparente con índice de refracción IOR = 1.333 y tinte configurable.
 pub fn water(tint: Color) -> Material {
-    Material::new(tint, 0.0, 0.1, 0.05, 0.95, 125.0, 1.333)
+    Material::new(tint, 0.1, 0.4, 0.15, 0.8, 90.0, 1.333)
 }
 
 /// Metal pulido reflectivo (70% reflexión especular indirecta) con color metálico configurable (oro, bronce, cobre, etc.).

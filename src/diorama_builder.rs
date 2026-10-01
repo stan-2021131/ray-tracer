@@ -61,10 +61,7 @@ impl DioramaMaterials {
             .with_uv_scale(1.0, 1.0)
             .with_wrap(TextureWrap::Repeat);
 
-        let water = materials::water(Color::new(255, 255, 255))
-            .with_texture(tm.water.clone())
-            .with_uv_scale(1.0, 1.0)
-            .with_wrap(TextureWrap::Repeat);
+        let water = materials::water(Color::new(85, 185, 230));
 
         let rock = materials::diffuse(Color::new(255, 255, 255))
             .with_texture(tm.stone.clone())
@@ -670,10 +667,10 @@ pub fn build_diorama_scene() -> Scene {
         mats.grass.clone().with_uv_scale(island_w / b, bank_south_d / b),
     )));
 
-    // Lecho del río con volumen de agua
+    // Lecho del río con volumen de agua (con micro-separación para evitar Z-fighting / puntos negros)
     objects.push(Object::Box3D(Box3D::new(
-        Vec3::new(0.0, 0.4 * b, 0.0),
-        Vec3::new(island_w, 0.8 * b, river_d),
+        Vec3::new(0.0, 0.405 * b, 0.0),
+        Vec3::new(island_w + 0.1 * b, 0.79 * b, river_d - 0.02 * b),
         mats.water.clone(),
     )));
 
