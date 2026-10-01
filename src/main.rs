@@ -28,8 +28,10 @@ use crate::renderer::{render, render_telescope};
 use crate::skybox::Skybox;
 use crate::texture::TextureFilter;
 
-const WIDTH: usize = 400;
-const HEIGHT: usize = 250;
+const WIDTH: usize = 560;
+const HEIGHT: usize = 380;
+const FAST_MAX_DEPTH: u32 = 1; // En movimiento: iluminación directa y texturas sin reflexiones recursivas pesadas
+const FULL_MAX_DEPTH: u32 = 3; // En reposo: reflexiones completas y refracciones de vidrio cristalinas
 const ROTATION_SPEED: f32 = PI / 45.0;
 const MOVE_SPEED: f32 = 0.2;
 
@@ -91,6 +93,7 @@ fn main() {
 
     let start_time = std::time::Instant::now();
     let mut camera_moved = true;
+    let mut needs_refine = false;
     let mut tab_was_down = false;
     let mut c_was_down = false;
     let mut e_was_down = false;
@@ -207,7 +210,7 @@ fn main() {
             }
         }
 
-        // --- Renderizado Reactivo ---
+        // --- Renderizado Reactivo con Optimización de Profundidad de Rayos ---
         let elapsed = start_time.elapsed().as_secs_f32();
         let (active_scene, is_telescope) = match current_state {
             GameSceneState::Diorama => (&mut diorama_scene, false),
@@ -219,13 +222,20 @@ fn main() {
             active_scene.update_time(elapsed);
         }
 
-        if camera_moved || has_animations {
+        let is_moving = camera_moved;
+        let should_render = is_moving || needs_refine || has_animations;
+
+        if should_render {
+            // En movimiento usamos FAST_MAX_DEPTH = 1 (resolución completa 1x1, sin rebotes pesados);
+            // al detenerse la cámara, se renderiza con FULL_MAX_DEPTH = 3 (reflexiones y refracciones completas).
+            let max_depth = if is_moving { FAST_MAX_DEPTH } else { FULL_MAX_DEPTH };
             if is_telescope {
-                // En el espacio: skybox cósmico omnidireccional con transparencia y visor telescópico
-                render_telescope(&mut framebuffer, &active_scene.objects, &camera, &active_scene.lights, Some(&space_skybox));
+                // En el espacio: skybox cósmico omnidireccional con visor telescópico
+                render_telescope(&mut framebuffer, &active_scene.objects, &camera, &active_scene.lights, Some(&space_skybox), max_depth);
             } else {
-                render(&mut framebuffer, &active_scene.objects, &camera, &active_scene.lights, Some(&diorama_skybox));
+                render(&mut framebuffer, &active_scene.objects, &camera, &active_scene.lights, Some(&diorama_skybox), max_depth);
             }
+            needs_refine = is_moving;
             camera_moved = false;
         }
 

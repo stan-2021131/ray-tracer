@@ -12,6 +12,7 @@ pub const FOV: f32 = PI / 3.0;
 pub const SHADOW_BIAS: f32 = 1e-3;
 pub const REFLECTION_BIAS: f32 = 1e-3;
 pub const REFRACTION_BIAS: f32 = 1e-3;
+#[allow(dead_code)]
 pub const MAX_DEPTH: u32 = 3;
 
 /// Calcula la dirección de reflexión especular de un rayo incidente sobre una normal.
@@ -141,8 +142,9 @@ pub fn cast_ray(
     lights: &[Light],
     skybox: Option<&Skybox>,
     depth: u32,
+    max_depth: u32,
 ) -> Color {
-    if depth > MAX_DEPTH {
+    if depth >= max_depth {
         return skybox
             .map(|sb| sb.sample(ray_direction))
             .unwrap_or_else(|| Color::from_hex(BACKGROUND_COLOR));
@@ -202,6 +204,7 @@ pub fn cast_ray(
                 lights,
                 skybox,
                 depth + 1,
+                max_depth,
             );
             has_refraction = true;
         } else {
@@ -227,6 +230,7 @@ pub fn cast_ray(
             lights,
             skybox,
             depth + 1,
+            max_depth,
         );
     }
 
@@ -246,6 +250,7 @@ pub fn render(
     camera: &Camera,
     lights: &[Light],
     skybox: Option<&Skybox>,
+    max_depth: u32,
 ) {
     let width = framebuffer.width as f32;
     let height = framebuffer.height as f32;
@@ -262,7 +267,7 @@ pub fn render(
         let ray_direction = normalize(&Vec3::new(screen_x, screen_y, -1.0));
         let ray_direction = camera.basis_change(&ray_direction);
 
-        let color = cast_ray(&camera.eye, &ray_direction, objects, lights, skybox, 0);
+        let color = cast_ray(&camera.eye, &ray_direction, objects, lights, skybox, 0, max_depth);
         color.to_hex()
     });
 }
@@ -274,6 +279,7 @@ pub fn render_telescope(
     camera: &Camera,
     lights: &[Light],
     skybox: Option<&Skybox>,
+    max_depth: u32,
 ) {
     let width = framebuffer.width as f32;
     let height = framebuffer.height as f32;
@@ -303,7 +309,7 @@ pub fn render_telescope(
         let ray_direction = normalize(&Vec3::new(screen_x, screen_y, -1.0));
         let ray_direction = camera.basis_change(&ray_direction);
 
-        let mut color = cast_ray(&camera.eye, &ray_direction, objects, lights, skybox, 0);
+        let mut color = cast_ray(&camera.eye, &ray_direction, objects, lights, skybox, 0, max_depth);
 
         // 2. Viñeta óptica suave en el borde del lente
         if r > radius_inner {
@@ -368,7 +374,7 @@ mod tests {
         let objects = vec![];
         let lights = vec![];
 
-        render_telescope(&mut fb, &objects, &camera, &lights, None);
+        render_telescope(&mut fb, &objects, &camera, &lights, None, 1);
 
         // Las 4 esquinas (x=0, y=0), (x=99, y=0), etc. están fuera del radio circular de la lente y deben ser negro absoluto 0x000000
         assert_eq!(fb.buffer[0], 0x000000, "La esquina superior izquierda debe ser negra");
