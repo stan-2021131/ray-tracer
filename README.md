@@ -6,9 +6,9 @@ Un motor de trazado de rayos (*Ray Tracer*) interactivo en tiempo real desarroll
 
 ## Demostración en Video
 
-<video src="docs/demo_ray_tracer.mp4" controls width="100%">
-  <a href="docs/demo_ray_tracer.mp4">Ver demo del Diorama Nocturno</a>
-</video>
+
+https://github.com/user-attachments/assets/8a177620-37d0-4c2c-bfcb-3bc02ffc5490
+
 
 ---
 
