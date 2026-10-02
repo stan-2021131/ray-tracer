@@ -6,9 +6,9 @@ Un motor de trazado de rayos (*Ray Tracer*) interactivo en tiempo real desarroll
 
 ## Demostración en Video
 
-> [!NOTE]
-> **Video Demostrativo del Diorama en Ejecución**:
-> [![Demostración del Diorama](https://img.shields.io/badge/Demo-Video%20del%20Diorama%20(Pendiente)-blue?style=for-the-badge)](docs/demo.mp4)
+<video src="docs/demo_ray_tracer.mp4" controls width="100%">
+  <a href="docs/demo_ray_tracer.mp4">Ver demo del Diorama Nocturno</a>
+</video>
 
 ---
 
